@@ -255,8 +255,8 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
     <main className="relative min-h-screen overflow-hidden px-4 py-4 text-white sm:px-6 lg:px-8">
       <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
 
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1600px] flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="table-shell relative flex min-h-[900px] flex-col rounded-[2.4rem] p-4 sm:p-5 lg:p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1920px] flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_360px] 2xl:relative 2xl:block 2xl:pr-4">
+        <section className="table-shell relative flex min-h-[900px] flex-col rounded-[2.4rem] p-4 sm:p-5 lg:p-6 2xl:mx-auto 2xl:max-w-[1184px]">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Online</p>
@@ -437,7 +437,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
           </div>
         </section>
 
-        <aside className="flex flex-col gap-4">
+        <aside className="flex flex-col gap-4 2xl:absolute 2xl:right-4 2xl:top-0 2xl:w-[360px]">
           <GameLog log={gameState.gameLog} />
 
           <div className="glass-panel rounded-[1.75rem] p-4 sm:p-5">
