@@ -10,7 +10,8 @@
     "start": "node scripts/start.mjs",
     "start:frontend": "next start --hostname localhost --port 3000",
     "start:backend": "tsx server.ts",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:big2": "tsx lib/big2/engine.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.40.0",

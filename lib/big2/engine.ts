@@ -5,54 +5,506 @@ import {
   SUIT_LABELS,
   SUIT_SYMBOLS,
 } from "@/lib/big2/constants";
-import { Card, EvaluatedMove, GameState, LogEntry, Player, ValidationResult } from "@/lib/big2/types";
+import {
+  Card,
+  EvaluatedMove,
+  GameState,
+  GameStatus,
+  LogEntry,
+  Move,
+  Player,
+  PlayerKind,
+  Rank,
+  Suit,
+  ValidationResult,
+} from "@/lib/big2/types";
 
+const PLAYER_COUNT = 4;
+const CARDS_PER_PLAYER = 13;
 const THREE_OF_DIAMONDS_ID = "0-0";
+const DEFAULT_SEAT_ORDER: Player["seat"][] = ["south", "west", "north", "east"];
+
+export function createDeck(): Card[] {
+  const deck: Card[] = [];
+
+  for (let rank = 0; rank < RANK_LABELS.length; rank += 1) {
+    for (let suit = 0; suit < SUIT_SYMBOLS.length; suit += 1) {
+      deck.push({
+        id: `${rank}-${suit}`,
+        rank: rank as Rank,
+        suit: suit as Suit,
+      });
+    }
+  }
+
+  return deck;
+}
+
+export function shuffleDeck(deck: Card[], random: () => number = Math.random): Card[] {
+  const copy = [...deck];
+
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+
+  return copy;
+}
+
+export function dealCards(deck: Card[]): Card[][] {
+  if (deck.length !== PLAYER_COUNT * CARDS_PER_PLAYER) {
+    throw new Error(`Expected a ${PLAYER_COUNT * CARDS_PER_PLAYER}-card deck, received ${deck.length}.`);
+  }
+
+  return Array.from({ length: PLAYER_COUNT }, (_, playerIndex) =>
+    deck.slice(playerIndex * CARDS_PER_PLAYER, (playerIndex + 1) * CARDS_PER_PLAYER),
+  );
+}
+
+export function sortCards(cards: Card[]): Card[] {
+  return [...cards].sort((left, right) => getCardValue(left) - getCardValue(right));
+}
+
+export function getCardValue(card: Card): number {
+  return card.rank * SUIT_SYMBOLS.length + getSuitValue(card.suit);
+}
+
+export function getSuitValue(suit: Suit): number {
+  return suit;
+}
+
+export function identifyMove(cards: Card[]): Move | null {
+  const sorted = sortCards(cards);
+
+  if (sorted.length === 1) {
+    const [card] = sorted;
+
+    return createMove(sorted, "single", 0, card.rank, undefined, card.suit, [getCardValue(card)], getCardLabel(card));
+  }
+
+  if (sorted.length === 2 && sorted[0].rank === sorted[1].rank) {
+    const topCard = sorted[1];
+
+    return createMove(
+      sorted,
+      "pair",
+      0,
+      sorted[0].rank,
+      undefined,
+      topCard.suit,
+      [sorted[0].rank, topCard.suit],
+      `a pair of ${getRankName(sorted[0].rank, true)}`,
+    );
+  }
+
+  if (sorted.length === 3 && sorted.every((card) => card.rank === sorted[0].rank)) {
+    const topCard = sorted[2];
+
+    return createMove(
+      sorted,
+      "triple",
+      0,
+      sorted[0].rank,
+      undefined,
+      topCard.suit,
+      [sorted[0].rank, topCard.suit],
+      `three ${getRankName(sorted[0].rank, true)}`,
+    );
+  }
+
+  if (sorted.length !== 5) {
+    return null;
+  }
+
+  const straightHighCard = getStraightHighCard(sorted);
+  const isFlush = sorted.every((card) => card.suit === sorted[0].suit);
+  const groups = groupCardsByRank(sorted);
+  const groupedCards = [...groups.values()].sort((left, right) => {
+    if (right.length !== left.length) {
+      return right.length - left.length;
+    }
+
+    return right[0].rank - left[0].rank;
+  });
+
+  if (straightHighCard && isFlush) {
+    return createMove(
+      sorted,
+      "straight-flush",
+      FIVE_CARD_STRENGTH["straight-flush"],
+      straightHighCard.rank,
+      undefined,
+      straightHighCard.suit,
+      buildStraightStrength(FIVE_CARD_STRENGTH["straight-flush"], straightHighCard),
+      `a straight flush, ${RANK_LABELS[straightHighCard.rank]} high`,
+    );
+  }
+
+  if (groupedCards[0]?.length === 4 && groupedCards[1]?.length === 1) {
+    const quadCards = sortCards(groupedCards[0]);
+    const kicker = groupedCards[1][0];
+
+    return createMove(
+      sorted,
+      "four-of-a-kind",
+      FIVE_CARD_STRENGTH["four-of-a-kind"],
+      quadCards[0].rank,
+      kicker.rank,
+      quadCards[3].suit,
+      buildFourOfAKindStrength(quadCards, kicker),
+      `four of a kind, ${getRankName(quadCards[0].rank, true)}`,
+    );
+  }
+
+  if (groupedCards[0]?.length === 3 && groupedCards[1]?.length === 2) {
+    const tripleCards = sortCards(groupedCards[0]);
+    const pairCards = sortCards(groupedCards[1]);
+
+    return createMove(
+      sorted,
+      "full-house",
+      FIVE_CARD_STRENGTH["full-house"],
+      tripleCards[0].rank,
+      pairCards[0].rank,
+      tripleCards[2].suit,
+      buildFullHouseStrength(tripleCards, pairCards),
+      `a full house, ${getRankName(tripleCards[0].rank, true)} over ${getRankName(pairCards[0].rank, true)}`,
+    );
+  }
+
+  if (isFlush) {
+    return createMove(
+      sorted,
+      "flush",
+      FIVE_CARD_STRENGTH.flush,
+      sorted[4].rank,
+      undefined,
+      sorted[4].suit,
+      buildFlushStrength(sorted),
+      `a ${getSuitName(sorted[0].suit)} flush`,
+    );
+  }
+
+  if (straightHighCard) {
+    return createMove(
+      sorted,
+      "straight",
+      FIVE_CARD_STRENGTH.straight,
+      straightHighCard.rank,
+      undefined,
+      straightHighCard.suit,
+      buildStraightStrength(FIVE_CARD_STRENGTH.straight, straightHighCard),
+      `a straight, ${RANK_LABELS[straightHighCard.rank]} high`,
+    );
+  }
+
+  return null;
+}
+
+export function isValidMove(cards: Card[]): boolean {
+  return identifyMove(cards) !== null;
+}
+
+export function compareMoves(moveA: Move, moveB: Move): number {
+  if (moveA.cardCount !== moveB.cardCount) {
+    return moveA.cardCount - moveB.cardCount;
+  }
+
+  return compareStrength(moveA.strength, moveB.strength);
+}
+
+export function canPlayMove(
+  selectedCards: Card[],
+  currentMove: Move | null,
+  isStartingTrick: boolean,
+  isFirstTurn: boolean,
+): ValidationResult {
+  if (selectedCards.length === 0) {
+    return {
+      valid: false,
+      message: isStartingTrick ? "Select cards to start the trick." : "Select cards that can beat the current move.",
+      move: null,
+    };
+  }
+
+  const move = identifyMove(selectedCards);
+
+  if (!move) {
+    return { valid: false, message: "Invalid card combination.", move: null };
+  }
+
+  if (isFirstTurn && !containsThreeOfDiamonds(move.cards)) {
+    return { valid: false, message: "The first move of the round must include 3 of Diamonds.", move };
+  }
+
+  if (isStartingTrick || !currentMove) {
+    return { valid: true, message: `Play ${move.summary}.`, move };
+  }
+
+  if (move.cardCount !== currentMove.cardCount) {
+    return { valid: false, message: "You must match the number of cards in the current move.", move };
+  }
+
+  if (compareMoves(move, currentMove) <= 0) {
+    return { valid: false, message: "Selected cards do not beat the current move.", move };
+  }
+
+  return { valid: true, message: `${move.summary} beats the current move.`, move };
+}
+
+export function applyMove(gameState: GameState, playerId: number, selectedCards: Card[] | Move): GameState {
+  if (gameState.winner !== null || gameState.status === "ended") {
+    return gameState;
+  }
+
+  if (gameState.turn.currentPlayer !== playerId) {
+    return gameState;
+  }
+
+  const cards = Array.isArray(selectedCards) ? selectedCards : selectedCards.cards;
+  const player = gameState.players[playerId];
+
+  if (!player || !playerHasCards(player, cards)) {
+    return gameState;
+  }
+
+  const validation = canPlayMove(
+    cards,
+    gameState.turn.currentMove,
+    gameState.turn.isStartingTrick,
+    gameState.turn.isFirstTurn,
+  );
+
+  if (!validation.valid || !validation.move) {
+    return gameState;
+  }
+
+  const playedCardIds = new Set(validation.move.cards.map((card) => card.id));
+  const nextPlayers = gameState.players.map((currentPlayer, index) =>
+    index === playerId
+      ? {
+          ...currentPlayer,
+          hand: sortCards(currentPlayer.hand.filter((card) => !playedCardIds.has(card.id))),
+        }
+      : currentPlayer,
+  );
+
+  const winner = checkWinner({ ...gameState, players: nextPlayers });
+  const nextCurrentPlayer = winner === null ? getNextPlayerIndex(gameState) : playerId;
+  const nextState = syncLegacyFields({
+    ...gameState,
+    players: nextPlayers,
+    status: winner === null ? "playing" : "ended",
+    winner,
+    turnCount: gameState.turnCount + 1,
+    turn: {
+      currentPlayer: nextCurrentPlayer,
+      currentMove: validation.move,
+      currentMovePlayer: playerId,
+      lastValidPlayPlayer: playerId,
+      passesInRow: 0,
+      isStartingTrick: false,
+      isFirstTurn: false,
+    },
+  });
+
+  const withPlayLog = appendLog(nextState, makeLog(`${player.name} played ${validation.move.summary}.`, "play"));
+
+  if (winner === null) {
+    return withPlayLog;
+  }
+
+  return appendLog(withPlayLog, makeLog(`${player.name} wins the round.`, "win"));
+}
+
+export function applyPass(gameState: GameState, playerId: number): GameState {
+  if (gameState.winner !== null || gameState.status === "ended") {
+    return gameState;
+  }
+
+  if (gameState.turn.currentPlayer !== playerId) {
+    return gameState;
+  }
+
+  if (gameState.turn.isStartingTrick || !gameState.turn.currentMove) {
+    return gameState;
+  }
+
+  const nextPassCount = gameState.turn.passesInRow + 1;
+  const withPassLog = appendLog(gameState, makeLog(`${gameState.players[playerId].name} passed.`, "pass"));
+
+  if (nextPassCount < gameState.players.length - 1) {
+    return syncLegacyFields({
+      ...withPassLog,
+      turnCount: withPassLog.turnCount + 1,
+      turn: {
+        ...withPassLog.turn,
+        currentPlayer: getNextPlayerIndex(withPassLog),
+        passesInRow: nextPassCount,
+      },
+    });
+  }
+
+  const clearedState = syncLegacyFields({
+    ...withPassLog,
+    turnCount: withPassLog.turnCount + 1,
+    turn: {
+      ...withPassLog.turn,
+      currentPlayer: withPassLog.turn.lastValidPlayPlayer,
+      currentMove: null,
+      currentMovePlayer: null,
+      passesInRow: 0,
+      isStartingTrick: true,
+    },
+  });
+
+  return appendLog(
+    clearedState,
+    makeLog(`${gameState.players[clearedState.turn.currentPlayer].name} starts a fresh trick.`, "system"),
+  );
+}
+
+export function getNextPlayerIndex(gameState: GameState): number {
+  return (gameState.turn.currentPlayer + 1) % gameState.players.length;
+}
+
+export function checkWinner(gameState: GameState): number | null {
+  const winnerIndex = gameState.players.findIndex((player) => player.hand.length === 0);
+  return winnerIndex === -1 ? null : winnerIndex;
+}
 
 export function createInitialGameState(): GameState {
-  const deck = shuffle(createDeck());
-  const hands = deal(deck);
-  const players: Player[] = PLAYER_BLUEPRINTS.map((blueprint, index) => ({
-    ...blueprint,
-    hand: sortCards(hands[index]),
-  }));
+  return createGameStateForPlayers(
+    PLAYER_BLUEPRINTS.map((blueprint) => ({
+      id: blueprint.id,
+      kind: blueprint.kind,
+      name: blueprint.name,
+      seat: blueprint.seat,
+    })),
+  );
+}
 
+export function createGameStateForPlayers(
+  playersInput: Array<{
+    id: number;
+    kind?: PlayerKind;
+    name: string;
+    seat?: Player["seat"];
+  }>,
+  random: () => number = Math.random,
+): GameState {
+  if (playersInput.length !== PLAYER_COUNT) {
+    throw new Error(`Expected ${PLAYER_COUNT} players, received ${playersInput.length}.`);
+  }
+
+  const deck = shuffleDeck(createDeck(), random);
+  const hands = dealCards(deck).map((hand) => sortCards(hand));
+  const players: Player[] = playersInput.map((player, index) => ({
+    id: player.id,
+    hand: hands[index],
+    kind: player.kind ?? "human",
+    name: player.name,
+    seat: player.seat ?? DEFAULT_SEAT_ORDER[index] ?? "south",
+  }));
   const starter = players.findIndex((player) => player.hand.some((card) => card.id === THREE_OF_DIAMONDS_ID));
 
-  return {
+  return syncLegacyFields({
     players,
+    status: "dealing",
+    winner: null,
+    log: [
+      makeLog(`${players[starter].name} holds 3 of Diamonds and starts the round.`, "system"),
+      makeLog("House rule: straights run from 3-4-5-6-7 up to 10-J-Q-K-A. 2 cannot be used in a straight.", "system"),
+    ],
+    turnCount: 0,
+    turn: {
+      currentPlayer: starter,
+      currentMove: null,
+      currentMovePlayer: null,
+      lastValidPlayPlayer: starter,
+      passesInRow: 0,
+      isStartingTrick: true,
+      isFirstTurn: true,
+    },
     currentPlayer: starter,
     leadPlayer: starter,
     currentTrick: null,
     currentTrickPlayer: null,
     passStreak: 0,
     firstTurn: true,
-    winner: null,
     phase: "dealing",
-    turnCount: 0,
-    log: [
-      makeLog(`${players[starter].name} holds 3♦ and will lead the opening trick.`, "system"),
-      makeLog("First play must include 3♦. Straights use 3 through A only in this version.", "system"),
-    ],
-  };
+  });
 }
 
-export function setPhase(state: GameState, phase: GameState["phase"]): GameState {
-  return {
+export function setPhase(state: GameState, phase: GameStatus): GameState {
+  return syncLegacyFields({
     ...state,
-    phase,
-  };
+    status: phase,
+  });
 }
 
-export function getCardLabel(card: Card) {
+export function getSelectionValidation(state: GameState, playerIndex: number, cards: Card[]): ValidationResult {
+  if (state.winner !== null) {
+    return { valid: false, message: `${state.players[state.winner].name} already won the round.`, move: null };
+  }
+
+  if (state.status === "dealing") {
+    return { valid: false, message: "Dealing cards...", move: null };
+  }
+
+  if (state.turn.currentPlayer !== playerIndex) {
+    return { valid: false, message: "Waiting for the other players.", move: null };
+  }
+
+  return canPlayMove(cards, state.turn.currentMove, state.turn.isStartingTrick, state.turn.isFirstTurn);
+}
+
+export function chooseCpuMove(state: GameState, playerIndex: number): Move | null {
+  const player = state.players[playerIndex];
+
+  if (!player || state.turn.currentPlayer !== playerIndex) {
+    return null;
+  }
+
+  const legalMoves = getLegalMoves(player.hand, state);
+
+  if (legalMoves.length === 0) {
+    return null;
+  }
+
+  legalMoves.sort((left, right) => {
+    if (state.turn.isStartingTrick && left.cardCount !== right.cardCount) {
+      return openingMovePriority(left.cardCount) - openingMovePriority(right.cardCount);
+    }
+
+    return compareMoves(left, right);
+  });
+
+  return legalMoves[0];
+}
+
+export function getPlayableCardIds(state: GameState, playerIndex: number, selectedCards: Card[] = []): Set<string> {
+  if (state.status !== "playing" || state.winner !== null || state.turn.currentPlayer !== playerIndex) {
+    return new Set<string>();
+  }
+
+  const selectedIds = new Set(selectedCards.map((card) => card.id));
+  const moves = getLegalMoves(state.players[playerIndex].hand, state).filter((move) =>
+    [...selectedIds].every((selectedId) => move.cards.some((card) => card.id === selectedId)),
+  );
+
+  return new Set(moves.flatMap((move) => move.cards.map((card) => card.id)));
+}
+
+export function getCardLabel(card: Card): string {
   return `${RANK_LABELS[card.rank]}${SUIT_SYMBOLS[card.suit]}`;
 }
 
-export function getSuitName(suit: number) {
-  return SUIT_LABELS[suit as 0 | 1 | 2 | 3];
+export function getSuitName(suit: Suit): string {
+  return SUIT_LABELS[suit];
 }
 
-export function getRankName(rank: number, plural = false) {
+export function getRankName(rank: Rank, plural = false): string {
   const singular = [
     "Three",
     "Four",
@@ -73,442 +525,137 @@ export function getRankName(rank: number, plural = false) {
     return singular;
   }
 
-  if (singular === "Six") {
-    return "Sixes";
+  if (singular.endsWith("x")) {
+    return `${singular}es`;
   }
 
-  if (singular === "Three") {
-    return "Threes";
-  }
-
-  if (singular === "Five") {
-    return "Fives";
+  if (singular.endsWith("e")) {
+    return `${singular}s`;
   }
 
   return `${singular}s`;
 }
 
-export function sortCards(cards: Card[]) {
-  return [...cards].sort(compareCards);
-}
+export const evaluateMove = identifyMove;
 
-export function compareCards(a: Card, b: Card) {
-  if (a.rank !== b.rank) {
-    return a.rank - b.rank;
-  }
-
-  return a.suit - b.suit;
-}
-
-export function getSelectionValidation(
-  state: GameState,
-  playerIndex: number,
+function createMove(
   cards: Card[],
-): ValidationResult {
-  if (state.winner !== null) {
-    return { valid: false, message: `${state.players[state.winner].name} already won the round.`, move: null };
-  }
-
-  if (state.phase === "dealing") {
-    return { valid: false, message: "Dealing cards...", move: null };
-  }
-
-  if (state.currentPlayer !== playerIndex) {
-    return { valid: false, message: "Waiting for the other players.", move: null };
-  }
-
-  if (cards.length === 0) {
-    if (state.currentTrick) {
-      return { valid: false, message: "Select cards that can beat the current play.", move: null };
-    }
-
-    return { valid: false, message: "Your turn.", move: null };
-  }
-
-  const move = evaluateMove(cards);
-
-  if (!move) {
-    return { valid: false, message: "Invalid hand.", move: null };
-  }
-
-  if (state.firstTurn && !cards.some((card) => card.id === THREE_OF_DIAMONDS_ID)) {
-    return { valid: false, message: "Opening play must include 3♦.", move };
-  }
-
-  if (!state.currentTrick) {
-    return { valid: true, message: `Play ${move.summary}.`, move };
-  }
-
-  if (move.cardCount !== state.currentTrick.cardCount) {
-    return { valid: false, message: "Match the current play size.", move };
-  }
-
-  if (move.cardCount === 5 && move.categoryStrength > state.currentTrick.categoryStrength) {
-    return { valid: true, message: `${move.summary} beats the current play.`, move };
-  }
-
-  if (move.handType !== state.currentTrick.handType) {
-    return {
-      valid: false,
-      message: "Must match the current hand type unless playing a stronger five-card category.",
-      move,
-    };
-  }
-
-  if (compareMoves(move, state.currentTrick) <= 0) {
-    return { valid: false, message: "Must beat current play.", move };
-  }
-
-  return { valid: true, message: `${move.summary} beats the current play.`, move };
-}
-
-export function applyMove(state: GameState, playerIndex: number, move: EvaluatedMove): GameState {
-  if (state.currentPlayer !== playerIndex || state.winner !== null) {
-    return state;
-  }
-
-  const nextPlayers = state.players.map((player, index) => {
-    if (index !== playerIndex) {
-      return player;
-    }
-
-    const moveIds = new Set(move.cards.map((card) => card.id));
-
-    return {
-      ...player,
-      hand: sortCards(player.hand.filter((card) => !moveIds.has(card.id))),
-    };
-  });
-
-  const winner = nextPlayers[playerIndex].hand.length === 0 ? playerIndex : null;
-
-  const nextState: GameState = {
-    ...state,
-    players: nextPlayers,
-    currentPlayer: winner === null ? (playerIndex + 1) % state.players.length : playerIndex,
-    leadPlayer: playerIndex,
-    currentTrick: move,
-    currentTrickPlayer: playerIndex,
-    passStreak: 0,
-    firstTurn: false,
-    winner,
-    phase: winner === null ? state.phase : "ended",
-    turnCount: state.turnCount + 1,
+  type: Move["type"],
+  categoryRank: number,
+  primaryRank: Rank,
+  secondaryRank: Rank | undefined,
+  topSuit: Suit,
+  strength: number[],
+  summary: string,
+): Move {
+  return {
+    cards,
+    type,
+    handType: type,
+    cardCount: cards.length as Move["cardCount"],
+    categoryRank,
+    primaryRank,
+    secondaryRank,
+    topSuit,
+    strength,
+    summary,
   };
-
-  const withPlayLog = appendLog(
-    nextState,
-    makeLog(`${state.players[playerIndex].name} played ${move.summary}.`, "play"),
-  );
-
-  if (winner === null) {
-    return withPlayLog;
-  }
-
-  return appendLog(
-    withPlayLog,
-    makeLog(`${state.players[playerIndex].name} wins the round.`, "win"),
-  );
 }
 
-export function applyPass(state: GameState, playerIndex: number): GameState {
-  if (state.currentPlayer !== playerIndex || state.winner !== null || !state.currentTrick) {
-    return state;
-  }
-
-  const nextPassStreak = state.passStreak + 1;
-  const passLogged = appendLog(state, makeLog(`${state.players[playerIndex].name} passed.`, "pass"));
-
-  if (nextPassStreak < state.players.length - 1) {
-    return {
-      ...passLogged,
-      currentPlayer: (playerIndex + 1) % state.players.length,
-      passStreak: nextPassStreak,
-      turnCount: state.turnCount + 1,
-    };
-  }
-
-  return appendLog(
-    {
-      ...passLogged,
-      currentPlayer: state.leadPlayer,
-      currentTrick: null,
-      currentTrickPlayer: null,
-      passStreak: 0,
-      turnCount: state.turnCount + 1,
-    },
-    makeLog(`${state.players[state.leadPlayer].name} takes the lead for a fresh trick.`, "system"),
-  );
+function buildStraightStrength(categoryRank: number, highCard: Card): number[] {
+  // Regional rule note:
+  // we compare straights by the highest card in Big 2 order,
+  // then by that highest card's suit if the ranks match.
+  return [categoryRank, highCard.rank, highCard.suit];
 }
 
-export function chooseCpuMove(state: GameState, playerIndex: number) {
-  const player = state.players[playerIndex];
-  const legalMoves = getLegalMoves(player.hand, state);
-
-  if (legalMoves.length === 0) {
-    return null;
-  }
-
-  legalMoves.sort((a, b) => {
-    if (!state.currentTrick) {
-      const sizeDiff = openingCardCountPriority(a.cardCount) - openingCardCountPriority(b.cardCount);
-      if (sizeDiff !== 0) {
-        return sizeDiff;
-      }
-    }
-
-    if (a.cardCount === 5 && b.cardCount === 5 && a.categoryStrength !== b.categoryStrength) {
-      return a.categoryStrength - b.categoryStrength;
-    }
-
-    return compareMoves(a, b);
-  });
-
-  return legalMoves[0];
+function buildFlushStrength(cards: Card[]): number[] {
+  // Regional rule note:
+  // flush comparison varies by table. This engine compares the
+  // strongest card first, then the next strongest card, using full
+  // Big 2 card order (rank first, suit second) as a deterministic tiebreak.
+  return [FIVE_CARD_STRENGTH.flush, ...sortCards(cards).reverse().map((card) => getCardValue(card))];
 }
 
-export function getPlayableCardIds(state: GameState, playerIndex: number, selectedCards: Card[] = []) {
-  if (
-    state.phase !== "playing" ||
-    state.winner !== null ||
-    state.currentPlayer !== playerIndex
-  ) {
-    return new Set<string>();
-  }
-
-  const player = state.players[playerIndex];
-  const selectedIds = new Set(selectedCards.map((card) => card.id));
-  const candidateMoves = getLegalMoves(player.hand, state).filter((move) =>
-    [...selectedIds].every((cardId) => move.cards.some((card) => card.id === cardId)),
-  );
-
-  return new Set(
-    candidateMoves.flatMap((move) =>
-      move.cards.map((card) => card.id),
-    ),
-  );
+function buildFullHouseStrength(tripleCards: Card[], pairCards: Card[]): number[] {
+  // Regional rule note:
+  // full houses are primarily compared by the triple rank.
+  // Pair rank and triple suit are included only as deterministic tiebreaks.
+  return [FIVE_CARD_STRENGTH["full-house"], tripleCards[0].rank, pairCards[0].rank, tripleCards[2].suit];
 }
 
-export function evaluateMove(cards: Card[]): EvaluatedMove | null {
+function buildFourOfAKindStrength(quadCards: Card[], kicker: Card): number[] {
+  // Regional rule note:
+  // four of a kind is compared by the quad rank first, then the kicker,
+  // then the highest suit inside the quad as a deterministic fallback.
+  return [FIVE_CARD_STRENGTH["four-of-a-kind"], quadCards[0].rank, kicker.rank, quadCards[3].suit, kicker.suit];
+}
+
+function getStraightHighCard(cards: Card[]): Card | null {
   const sorted = sortCards(cards);
+  const uniqueRanks = new Set(sorted.map((card) => card.rank));
 
-  if (sorted.length === 1) {
-    const [card] = sorted;
-    return {
-      cards: sorted,
-      cardCount: 1,
-      handType: "single",
-      categoryStrength: 0,
-      primaryRank: card.rank,
-      topSuit: card.suit,
-      strength: [card.rank, card.suit],
-      summary: `${getCardLabel(card)}`,
-    };
-  }
-
-  if (sorted.length === 2 && sorted[0].rank === sorted[1].rank) {
-    return {
-      cards: sorted,
-      cardCount: 2,
-      handType: "pair",
-      categoryStrength: 0,
-      primaryRank: sorted[0].rank,
-      topSuit: sorted[1].suit,
-      strength: [sorted[0].rank, sorted[1].suit],
-      summary: `a pair of ${getRankName(sorted[0].rank, true)}`,
-    };
-  }
-
-  if (sorted.length === 3 && sorted.every((card) => card.rank === sorted[0].rank)) {
-    return {
-      cards: sorted,
-      cardCount: 3,
-      handType: "triple",
-      categoryStrength: 0,
-      primaryRank: sorted[0].rank,
-      topSuit: sorted[2].suit,
-      strength: [sorted[0].rank, sorted[2].suit],
-      summary: `three ${getRankName(sorted[0].rank, true)}`,
-    };
-  }
-
-  if (sorted.length !== 5) {
+  if (uniqueRanks.size !== 5) {
     return null;
   }
 
-  const isFlush = sorted.every((card) => card.suit === sorted[0].suit);
-  const straightHighCard = getStraightHighCard(sorted);
-  const groups = groupByRank(sorted);
-  const counts = [...groups.values()].map((group) => group.length).sort((a, b) => b - a);
-
-  if (straightHighCard && isFlush) {
-    return {
-      cards: sorted,
-      cardCount: 5,
-      handType: "straight-flush",
-      categoryStrength: FIVE_CARD_STRENGTH["straight-flush"],
-      primaryRank: straightHighCard.rank,
-      topSuit: straightHighCard.suit,
-      strength: [straightHighCard.rank, straightHighCard.suit],
-      summary: `a straight flush, ${RANK_LABELS[straightHighCard.rank]} high`,
-    };
+  // Regional rule note:
+  // some Big 2 tables allow A-2-3-4-5 or other 2-containing straights.
+  // This engine uses the stricter sequence 3-4-5-6-7 up to 10-J-Q-K-A only.
+  if (sorted[4].rank > 11) {
+    return null;
   }
 
-  if (counts[0] === 4) {
-    const quadGroup = [...groups.values()].find((group) => group.length === 4);
-    const kicker = [...groups.values()].find((group) => group.length === 1);
-
-    if (!quadGroup || !kicker) {
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (sorted[index].rank !== sorted[index - 1].rank + 1) {
       return null;
     }
-
-    const quadHighSuit = sortCards(quadGroup)[3].suit;
-
-    return {
-      cards: sorted,
-      cardCount: 5,
-      handType: "four-of-a-kind",
-      categoryStrength: FIVE_CARD_STRENGTH["four-of-a-kind"],
-      primaryRank: quadGroup[0].rank,
-      secondaryRank: kicker[0].rank,
-      topSuit: quadHighSuit,
-      strength: [quadGroup[0].rank, quadHighSuit, kicker[0].rank, kicker[0].suit],
-      summary: `four of a kind, ${getRankName(quadGroup[0].rank, true)}`,
-    };
   }
 
-  if (counts[0] === 3 && counts[1] === 2) {
-    const tripleGroup = [...groups.values()].find((group) => group.length === 3);
-    const pairGroup = [...groups.values()].find((group) => group.length === 2);
-
-    if (!tripleGroup || !pairGroup) {
-      return null;
-    }
-
-    const tripleHighSuit = sortCards(tripleGroup)[2].suit;
-
-    return {
-      cards: sorted,
-      cardCount: 5,
-      handType: "full-house",
-      categoryStrength: FIVE_CARD_STRENGTH["full-house"],
-      primaryRank: tripleGroup[0].rank,
-      secondaryRank: pairGroup[0].rank,
-      topSuit: tripleHighSuit,
-      strength: [tripleGroup[0].rank, tripleHighSuit, pairGroup[0].rank],
-      summary: `a full house, ${getRankName(tripleGroup[0].rank, true)} over ${getRankName(pairGroup[0].rank, true)}`,
-    };
-  }
-
-  if (isFlush) {
-    const descending = [...sorted].sort((a, b) => compareCardPower(b, a));
-
-    return {
-      cards: sorted,
-      cardCount: 5,
-      handType: "flush",
-      categoryStrength: FIVE_CARD_STRENGTH.flush,
-      primaryRank: descending[0].rank,
-      topSuit: descending[0].suit,
-      strength: descending.map(cardPower),
-      summary: `a ${getSuitName(sorted[0].suit)} flush`,
-    };
-  }
-
-  if (straightHighCard) {
-    return {
-      cards: sorted,
-      cardCount: 5,
-      handType: "straight",
-      categoryStrength: FIVE_CARD_STRENGTH.straight,
-      primaryRank: straightHighCard.rank,
-      topSuit: straightHighCard.suit,
-      strength: [straightHighCard.rank, straightHighCard.suit],
-      summary: `a straight, ${RANK_LABELS[straightHighCard.rank]} high`,
-    };
-  }
-
-  return null;
+  return sorted[4];
 }
 
-export function compareMoves(a: EvaluatedMove, b: EvaluatedMove) {
-  if (a.cardCount === 5 && b.cardCount === 5 && a.categoryStrength !== b.categoryStrength) {
-    return a.categoryStrength - b.categoryStrength;
-  }
-
-  return compareStrengthArrays(a.strength, b.strength);
+function groupCardsByRank(cards: Card[]): Map<Rank, Card[]> {
+  return cards.reduce((groups, card) => {
+    const existing = groups.get(card.rank) ?? [];
+    existing.push(card);
+    groups.set(card.rank, existing);
+    return groups;
+  }, new Map<Rank, Card[]>());
 }
 
-function getLegalMoves(hand: Card[], state: GameState) {
-  const candidates = [
-    ...buildCombinations(hand, 1),
-    ...buildCombinations(hand, 2),
-    ...buildCombinations(hand, 3),
-    ...buildCombinations(hand, 5),
-  ];
+function compareStrength(left: number[], right: number[]): number {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const delta = (left[index] ?? 0) - (right[index] ?? 0);
 
-  return candidates
-    .map((combo) => evaluateMove(combo))
-    .filter((move): move is EvaluatedMove => move !== null)
-    .filter((move) => {
-      if (state.firstTurn && !move.cards.some((card) => card.id === THREE_OF_DIAMONDS_ID)) {
-        return false;
-      }
-
-      if (!state.currentTrick) {
-        return true;
-      }
-
-      if (move.cardCount !== state.currentTrick.cardCount) {
-        return false;
-      }
-
-      if (move.cardCount === 5 && move.categoryStrength > state.currentTrick.categoryStrength) {
-        return true;
-      }
-
-      if (move.handType !== state.currentTrick.handType) {
-        return false;
-      }
-
-      return compareMoves(move, state.currentTrick) > 0;
-    });
-}
-
-function createDeck() {
-  const deck: Card[] = [];
-
-  for (let rank = 0; rank < RANK_LABELS.length; rank += 1) {
-    for (let suit = 0; suit < SUIT_SYMBOLS.length; suit += 1) {
-      deck.push({
-        id: `${rank}-${suit}`,
-        rank: rank as Card["rank"],
-        suit: suit as Card["suit"],
-      });
+    if (delta !== 0) {
+      return delta;
     }
   }
 
-  return deck;
+  return 0;
 }
 
-function shuffle(deck: Card[]) {
-  const copy = [...deck];
-
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-  }
-
-  return copy;
+function containsThreeOfDiamonds(cards: Card[]): boolean {
+  return cards.some((card) => card.id === THREE_OF_DIAMONDS_ID);
 }
 
-function deal(deck: Card[]) {
-  return Array.from({ length: 4 }, (_, playerIndex) =>
-    deck.filter((_, cardIndex) => cardIndex % 4 === playerIndex),
-  );
+function playerHasCards(player: Player, cards: Card[]): boolean {
+  const handIds = new Set(player.hand.map((card) => card.id));
+  return cards.every((card) => handIds.has(card.id));
 }
 
-function buildCombinations(cards: Card[], size: number) {
+function getLegalMoves(hand: Card[], state: GameState): Move[] {
+  return [1, 2, 3, 5]
+    .flatMap((size) => buildCombinations(hand, size))
+    .map((cards) => identifyMove(cards))
+    .filter((move): move is Move => move !== null)
+    .filter((move) =>
+      canPlayMove(move.cards, state.turn.currentMove, state.turn.isStartingTrick, state.turn.isFirstTurn).valid,
+    );
+}
+
+function buildCombinations(cards: Card[], size: number): Card[][] {
   const result: Card[][] = [];
 
   const walk = (startIndex: number, current: Card[]) => {
@@ -528,67 +675,11 @@ function buildCombinations(cards: Card[], size: number) {
   return result;
 }
 
-function getStraightHighCard(cards: Card[]) {
-  const sorted = sortCards(cards);
-  const uniqueRanks = new Set(sorted.map((card) => card.rank));
-
-  if (uniqueRanks.size !== 5) {
-    return null;
-  }
-
-  // Assumption for this version:
-  // straights run only from 3-4-5-6-7 up to 10-J-Q-K-A.
-  // We intentionally do not allow wraparound sequences that include 2.
-  if (sorted[4].rank > 11) {
-    return null;
-  }
-
-  for (let index = 1; index < sorted.length; index += 1) {
-    if (sorted[index].rank !== sorted[index - 1].rank + 1) {
-      return null;
-    }
-  }
-
-  return sorted[4];
+function openingMovePriority(cardCount: Move["cardCount"]): number {
+  return { 1: 1, 2: 2, 3: 3, 5: 4 }[cardCount];
 }
 
-function groupByRank(cards: Card[]) {
-  const map = new Map<number, Card[]>();
-
-  cards.forEach((card) => {
-    const group = map.get(card.rank) ?? [];
-    group.push(card);
-    map.set(card.rank, group);
-  });
-
-  return map;
-}
-
-function openingCardCountPriority(cardCount: number) {
-  return { 1: 1, 2: 2, 3: 3, 5: 4 }[cardCount] ?? 10;
-}
-
-function compareStrengthArrays(a: number[], b: number[]) {
-  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
-    const delta = (a[index] ?? 0) - (b[index] ?? 0);
-
-    if (delta !== 0) {
-      return delta;
-    }
-  }
-
-  return 0;
-}
-
-function cardPower(card: Card) {
-  return card.rank * 4 + card.suit;
-}
-
-function compareCardPower(a: Card, b: Card) {
-  return cardPower(a) - cardPower(b);
-}
-
-function appendLog(state: GameState, entry: LogEntry) {
+function appendLog(state: GameState, entry: LogEntry): GameState {
   return {
     ...state,
     log: [entry, ...state.log].slice(0, 14),
@@ -600,5 +691,18 @@ function makeLog(message: string, tone: LogEntry["tone"]): LogEntry {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     message,
     tone,
+  };
+}
+
+function syncLegacyFields(state: GameState): GameState {
+  return {
+    ...state,
+    currentPlayer: state.turn.currentPlayer,
+    leadPlayer: state.turn.lastValidPlayPlayer,
+    currentTrick: state.turn.currentMove,
+    currentTrickPlayer: state.turn.currentMovePlayer,
+    passStreak: state.turn.passesInRow,
+    firstTurn: state.turn.isFirstTurn,
+    phase: state.status,
   };
 }

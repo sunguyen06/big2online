@@ -5,8 +5,13 @@ import {
   CreateRoomRequest,
   GameStartedPayload,
   JoinRoomRequest,
+  LeaveRoomRequest,
   LobbyJoinSuccess,
   LobbyRoom,
+  PassTurnRequest,
+  PlayCardsRequest,
+  PrivateHandPayload,
+  PublicGameState,
   SocketAck,
   StartGameRequest,
 } from "./lib/multiplayer/types";
@@ -39,14 +44,39 @@ const io = new SocketIOServer(httpServer, {
 });
 
 const emitRoomUpdate = (room: LobbyRoom) => {
-  io.to(room.code).emit("lobby:room-updated", room);
+  io.to(room.code).emit("roomUpdated", room);
 };
 
-const detachSocketFromTrackedRoom = (socketId: string) => {
-  const removal = store.removeSocket(socketId);
+const emitError = (socketId: string, message: string) => {
+  io.to(socketId).emit("errorMessage", message);
+};
 
-  if (removal && !removal.deleted && removal.room) {
-    emitRoomUpdate(removal.room);
+const emitInvalidMove = (socketId: string, message: string) => {
+  io.to(socketId).emit("invalidMove", { message });
+};
+
+const emitGameState = (roomCode: string, state: PublicGameState) => {
+  io.to(roomCode).emit("gameStateUpdated", state);
+};
+
+const emitPrivateHand = (payload: PrivateHandPayload) => {
+  const room = store.getRoom(payload.roomCode);
+  const player = room?.players.find((entry) => entry.id === payload.playerId);
+
+  if (!player?.socketId) {
+    return;
+  }
+
+  io.to(player.socketId).emit("privateHandUpdated", payload);
+};
+
+const emitAllPrivateHands = (room: LobbyRoom) => {
+  for (const player of room.players) {
+    const payload = store.getPrivateHand(room.code, player.id);
+
+    if (payload) {
+      emitPrivateHand(payload);
+    }
   }
 };
 
@@ -73,20 +103,79 @@ const succeed = <T>(ack: (response: SocketAck<T>) => void, data: T) => {
   });
 };
 
-const fail = <T>(ack: (response: SocketAck<T>) => void, message: string) => {
+const fail = <T>(ack: (response: SocketAck<T>) => void, socketId: string, message: string) => {
+  emitError(socketId, message);
   ack({
     error: message,
     ok: false,
   });
 };
 
+const syncGameStateForSocket = (socketId: string, roomCode: string, playerId: string) => {
+  const state = store.getPublicGameState(roomCode);
+  const hand = store.getPrivateHand(roomCode, playerId);
+
+  if (state) {
+    emitGameState(roomCode, state);
+  }
+
+  if (hand) {
+    emitPrivateHand(hand);
+  }
+
+  const room = store.getRoom(roomCode);
+
+  if (room) {
+    emitRoomUpdate(room);
+  }
+
+  if (!state) {
+    emitError(socketId, "This room does not currently have an active game.");
+  }
+};
+
+const emitGameBundle = (roomCode: string, state: PublicGameState) => {
+  emitGameState(roomCode, state);
+  const room = store.getRoom(roomCode);
+
+  if (room) {
+    emitAllPrivateHands(room);
+  }
+};
+
+const detachSocketFromTrackedRoom = (socketId: string) => {
+  const removal = store.removeSocket(socketId);
+
+  if (!removal || removal.deleted || !removal.room) {
+    return;
+  }
+
+  if (removal.disconnectEvent) {
+    io.to(removal.room.code).emit("playerDisconnected", removal.disconnectEvent);
+  }
+
+  emitRoomUpdate(removal.room);
+
+  if (removal.state) {
+    emitGameState(removal.room.code, removal.state);
+  }
+};
+
+const validateActingPlayer = (socketId: string, playerId: string) => {
+  const boundPlayerId = store.getPlayerIdForSocket(socketId);
+
+  if (!boundPlayerId || boundPlayerId !== playerId) {
+    throw new Error("This socket is not authorized for that player session.");
+  }
+};
+
 io.on("connection", (socket) => {
-  socket.on("lobby:create-room", (payload: CreateRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
+  socket.on("createRoom", (payload: CreateRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
     const name = sanitizeDisplayName(payload.name);
     const nameValidation = validateDisplayName(name);
 
     if (!nameValidation.valid) {
-      fail(ack, nameValidation.message);
+      fail(ack, socket.id, nameValidation.message);
       return;
     }
 
@@ -97,22 +186,22 @@ io.on("connection", (socket) => {
       succeed(ack, result);
       emitRoomUpdate(result.room);
     } catch (error) {
-      fail(ack, error instanceof Error ? error.message : "Unable to create that room.");
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to create that room.");
     }
   });
 
-  socket.on("lobby:join-room", (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
+  socket.on("joinRoom", (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
     const name = sanitizeDisplayName(payload.name);
     const nameValidation = validateDisplayName(name);
     const roomCodeValidation = validateRoomCode(payload.roomCode);
 
     if (!nameValidation.valid) {
-      fail(ack, nameValidation.message);
+      fail(ack, socket.id, nameValidation.message);
       return;
     }
 
     if (!roomCodeValidation.valid) {
-      fail(ack, roomCodeValidation.message);
+      fail(ack, socket.id, roomCodeValidation.message);
       return;
     }
 
@@ -129,27 +218,27 @@ io.on("connection", (socket) => {
       succeed(ack, result);
       emitRoomUpdate(result.room);
     } catch (error) {
-      fail(ack, error instanceof Error ? error.message : "Unable to join that room.");
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to join that room.");
     }
   });
 
-  socket.on("lobby:resume-session", (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
+  socket.on("resumeSession", (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
     const name = sanitizeDisplayName(payload.name);
     const nameValidation = validateDisplayName(name);
     const roomCodeValidation = validateRoomCode(payload.roomCode);
 
     if (!payload.playerId) {
-      fail(ack, "No saved player session was provided.");
+      fail(ack, socket.id, "No saved player session was provided.");
       return;
     }
 
     if (!nameValidation.valid) {
-      fail(ack, nameValidation.message);
+      fail(ack, socket.id, nameValidation.message);
       return;
     }
 
     if (!roomCodeValidation.valid) {
-      fail(ack, roomCodeValidation.message);
+      fail(ack, socket.id, roomCodeValidation.message);
       return;
     }
 
@@ -164,29 +253,100 @@ io.on("connection", (socket) => {
       bindSocketToRoom(socket.id, result.room.code);
       succeed(ack, result);
       emitRoomUpdate(result.room);
+
+      if (result.room.status === "game") {
+        syncGameStateForSocket(socket.id, result.room.code, result.player.id);
+      }
     } catch (error) {
-      fail(ack, error instanceof Error ? error.message : "Unable to restore that room session.");
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to restore that room session.");
     }
   });
 
-  socket.on("lobby:start-game", (payload: StartGameRequest, ack: (response: SocketAck<LobbyRoom>) => void) => {
+  socket.on("startGame", (payload: StartGameRequest, ack: (response: SocketAck<GameStartedPayload>) => void) => {
     try {
-      const room = store.startGame(payload.roomCode, payload.playerId);
-      const gamePayload: GameStartedPayload = {
-        room,
-        startedByPlayerId: payload.playerId,
-      };
-
-      succeed(ack, room);
-      io.to(room.code).emit("lobby:game-started", gamePayload);
-      emitRoomUpdate(room);
+      validateActingPlayer(socket.id, payload.playerId);
+      const result = store.startGame(payload.roomCode, payload.playerId);
+      succeed(ack, result);
+      io.to(result.room.code).emit("gameStarted", result);
+      emitRoomUpdate(result.room);
+      emitGameBundle(result.room.code, result.state);
     } catch (error) {
-      fail(ack, error instanceof Error ? error.message : "Unable to start the game.");
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to start the game.");
+    }
+  });
+
+  socket.on("playCards", (payload: PlayCardsRequest, ack: (response: SocketAck<PublicGameState>) => void) => {
+    try {
+      validateActingPlayer(socket.id, payload.playerId);
+      const result = store.playCards(payload.roomCode, payload.playerId, payload.cardIds);
+      succeed(ack, result.state!);
+      emitGameBundle(result.room.code, result.state!);
+
+      if (result.finished) {
+        io.to(result.room.code).emit("gameFinished", result.finished);
+      }
+    } catch (error) {
+      if (error instanceof Error && "code" in error && (error as { code?: string }).code === "INVALID_MOVE") {
+        emitInvalidMove(socket.id, error.message);
+        ack({ error: error.message, ok: false });
+        return;
+      }
+
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to play those cards.");
+    }
+  });
+
+  socket.on("passTurn", (payload: PassTurnRequest, ack: (response: SocketAck<PublicGameState>) => void) => {
+    try {
+      validateActingPlayer(socket.id, payload.playerId);
+      const result = store.passTurn(payload.roomCode, payload.playerId);
+      succeed(ack, result.state!);
+      emitGameBundle(result.room.code, result.state!);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && (error as { code?: string }).code === "INVALID_MOVE") {
+        emitInvalidMove(socket.id, error.message);
+        ack({ error: error.message, ok: false });
+        return;
+      }
+
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to pass right now.");
+    }
+  });
+
+  socket.on("leaveRoom", (payload: LeaveRoomRequest, ack: (response: SocketAck<{ ok: true }>) => void) => {
+    try {
+      validateActingPlayer(socket.id, payload.playerId);
+      const result = store.leaveRoom(payload.roomCode, payload.playerId, socket.id);
+      succeed(ack, { ok: true });
+
+      if (result.disconnectEvent && result.room) {
+        io.to(result.room.code).emit("playerDisconnected", result.disconnectEvent);
+        emitRoomUpdate(result.room);
+
+        if (result.state) {
+          emitGameState(result.room.code, result.state);
+        }
+      }
+    } catch (error) {
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to leave the room.");
     }
   });
 
   socket.on("disconnect", () => {
-    detachSocketFromTrackedRoom(socket.id);
+    const removal = store.removeSocket(socket.id);
+
+    if (!removal || removal.deleted) {
+      return;
+    }
+
+    if (removal.disconnectEvent && removal.room) {
+      io.to(removal.room.code).emit("playerDisconnected", removal.disconnectEvent);
+      emitRoomUpdate(removal.room);
+
+      if (removal.state) {
+        emitGameState(removal.room.code, removal.state);
+      }
+    }
   });
 });
 

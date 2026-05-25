@@ -249,7 +249,7 @@ export function Big2Game() {
               </div>
             </div>
 
-            <WinnerModal winnerName={winnerName} onRestart={handleRestart} />
+            <WinnerModal actionLabel="Deal Another Round" onAction={handleRestart} winnerName={winnerName} />
           </div>
         </section>
 

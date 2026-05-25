@@ -57,7 +57,7 @@ function persistJoinResult(data: LobbyJoinSuccess) {
 export async function createRoomSession(request: CreateRoomRequest) {
   try {
     await ensureSocketConnected();
-    const response = await emitWithAck<LobbyJoinSuccess, CreateRoomRequest>("lobby:create-room", {
+    const response = await emitWithAck<LobbyJoinSuccess, CreateRoomRequest>("createRoom", {
       ...request,
       name: sanitizeDisplayName(request.name),
     });
@@ -87,7 +87,7 @@ export async function createRoomSession(request: CreateRoomRequest) {
 export async function joinRoomSession(request: JoinRoomRequest) {
   try {
     await ensureSocketConnected();
-    const response = await emitWithAck<LobbyJoinSuccess, JoinRoomRequest>("lobby:join-room", {
+    const response = await emitWithAck<LobbyJoinSuccess, JoinRoomRequest>("joinRoom", {
       ...request,
       name: sanitizeDisplayName(request.name),
       roomCode: normalizeRoomCode(request.roomCode),

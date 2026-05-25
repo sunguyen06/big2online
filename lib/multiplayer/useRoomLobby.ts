@@ -56,6 +56,11 @@ export function useRoomLobby(roomCodeFromRoute: string) {
           status: nextRoom.status,
         });
       }
+
+      if (nextRoom.status === "game") {
+        saveGameSnapshot(nextRoom, currentPlayerId);
+        router.push(`/game/${nextRoom.code}`);
+      }
     };
 
     const handleGameStarted = ({ room: nextRoom }: GameStartedPayload) => {
@@ -87,7 +92,7 @@ export function useRoomLobby(roomCodeFromRoute: string) {
         return;
       }
 
-      const response = await emitWithAck<{ player: { id: string }; room: LobbyRoom }, JoinRoomRequest>("lobby:resume-session", {
+      const response = await emitWithAck<{ player: { id: string }; room: LobbyRoom }, JoinRoomRequest>("resumeSession", {
         name: latestSession.name,
         playerId: latestSession.playerId,
         preferredSeatIndex: latestSession.seatIndex,
@@ -108,8 +113,8 @@ export function useRoomLobby(roomCodeFromRoute: string) {
     socket.on("connect", handleConnect);
     socket.on("connect_error", handleConnectError);
     socket.on("disconnect", handleDisconnect);
-    socket.on("lobby:room-updated", handleRoomUpdated);
-    socket.on("lobby:game-started", handleGameStarted);
+    socket.on("roomUpdated", handleRoomUpdated);
+    socket.on("gameStarted", handleGameStarted);
 
     if (!socket.connected) {
       socket.connect();
@@ -122,8 +127,8 @@ export function useRoomLobby(roomCodeFromRoute: string) {
       socket.off("connect", handleConnect);
       socket.off("connect_error", handleConnectError);
       socket.off("disconnect", handleDisconnect);
-      socket.off("lobby:room-updated", handleRoomUpdated);
-      socket.off("lobby:game-started", handleGameStarted);
+      socket.off("roomUpdated", handleRoomUpdated);
+      socket.off("gameStarted", handleGameStarted);
     };
   }, [currentPlayerId, initialSession, normalizedRouteCode, router]);
 
@@ -144,7 +149,7 @@ export function useRoomLobby(roomCodeFromRoute: string) {
     setIsStartingGame(true);
     setErrorMessage("");
 
-    const response = await emitWithAck<LobbyRoom, StartGameRequest>("lobby:start-game", {
+    const response = await emitWithAck<GameStartedPayload, StartGameRequest>("startGame", {
       playerId: currentPlayerId,
       roomCode: room.code,
     });

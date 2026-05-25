@@ -1,9 +1,12 @@
-export type Suit = 0 | 1 | 2 | 3;
-export type Rank = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export const SUITS = [0, 1, 2, 3] as const;
+export const RANKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+export type Suit = (typeof SUITS)[number];
+export type Rank = (typeof RANKS)[number];
 export type Seat = "south" | "west" | "north" | "east";
 export type PlayerKind = "human" | "cpu";
 
-export type HandType =
+export type MoveType =
   | "single"
   | "pair"
   | "triple"
@@ -13,23 +16,29 @@ export type HandType =
   | "four-of-a-kind"
   | "straight-flush";
 
+export type HandType = MoveType;
+export type GameStatus = "dealing" | "playing" | "ended";
+
 export interface Card {
   id: string;
   rank: Rank;
   suit: Suit;
 }
 
-export interface EvaluatedMove {
+export interface Move {
   cards: Card[];
+  type: MoveType;
+  handType: MoveType;
   cardCount: 1 | 2 | 3 | 5;
-  handType: HandType;
-  categoryStrength: number;
-  primaryRank: number;
-  secondaryRank?: number;
-  topSuit: number;
+  categoryRank: number;
+  primaryRank: Rank;
+  secondaryRank?: Rank;
+  topSuit: Suit;
   strength: number[];
   summary: string;
 }
+
+export type EvaluatedMove = Move;
 
 export interface Player {
   id: number;
@@ -37,6 +46,16 @@ export interface Player {
   kind: PlayerKind;
   seat: Seat;
   hand: Card[];
+}
+
+export interface TurnState {
+  currentPlayer: number;
+  currentMove: Move | null;
+  currentMovePlayer: number | null;
+  lastValidPlayPlayer: number;
+  passesInRow: number;
+  isStartingTrick: boolean;
+  isFirstTurn: boolean;
 }
 
 export interface LogEntry {
@@ -47,20 +66,22 @@ export interface LogEntry {
 
 export interface GameState {
   players: Player[];
+  status: GameStatus;
+  turn: TurnState;
+  winner: number | null;
+  log: LogEntry[];
+  turnCount: number;
   currentPlayer: number;
   leadPlayer: number;
-  currentTrick: EvaluatedMove | null;
+  currentTrick: Move | null;
   currentTrickPlayer: number | null;
   passStreak: number;
   firstTurn: boolean;
-  winner: number | null;
-  phase: "dealing" | "playing" | "ended";
-  log: LogEntry[];
-  turnCount: number;
+  phase: GameStatus;
 }
 
 export interface ValidationResult {
   valid: boolean;
   message: string;
-  move: EvaluatedMove | null;
+  move: Move | null;
 }

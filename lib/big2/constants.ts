@@ -2,7 +2,7 @@ import { Seat } from "@/lib/big2/types";
 
 export const RANK_LABELS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"] as const;
 export const SUIT_LABELS = ["Diamonds", "Clubs", "Hearts", "Spades"] as const;
-export const SUIT_SYMBOLS = ["♦", "♣", "♥", "♠"] as const;
+export const SUIT_SYMBOLS = ["\u2666", "\u2663", "\u2665", "\u2660"] as const;
 
 export const FIVE_CARD_STRENGTH: Record<string, number> = {
   straight: 1,
