@@ -44,6 +44,11 @@ export interface StartGameRequest {
   roomCode: string;
 }
 
+export interface RestartGameRequest {
+  playerId: string;
+  roomCode: string;
+}
+
 export interface LobbyJoinSuccess {
   player: LobbyPlayer;
   room: LobbyRoom;

@@ -4,14 +4,20 @@ import { AnimatePresence, motion } from "framer-motion";
 
 interface WinnerModalProps {
   actionLabel?: string;
+  actionDisabled?: boolean;
   message?: string;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
   winnerName: string | null;
   onAction: () => void;
 }
 
 export function WinnerModal({
   actionLabel = "Back To Lobby",
+  actionDisabled = false,
   message = "cleared every card and takes the table.",
+  secondaryActionLabel,
+  onSecondaryAction,
   winnerName,
   onAction,
 }: WinnerModalProps) {
@@ -40,10 +46,21 @@ export function WinnerModal({
             <button
               type="button"
               onClick={onAction}
-              className="mt-6 rounded-full bg-[linear-gradient(180deg,#ffe7a4_0%,#d4b464_100%)] px-6 py-3 text-sm font-bold text-slate-900 shadow-[0_12px_24px_rgba(212,180,100,0.28)] transition hover:brightness-105"
+              disabled={actionDisabled}
+              className="ui-button ui-button-gold mt-6 rounded-full px-6 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
             >
               {actionLabel}
             </button>
+
+            {secondaryActionLabel && onSecondaryAction ? (
+              <button
+                type="button"
+                onClick={onSecondaryAction}
+                className="ui-button ui-button-ghost mt-3 rounded-full px-6 py-3 text-sm font-semibold"
+              >
+                {secondaryActionLabel}
+              </button>
+            ) : null}
           </motion.div>
         </motion.div>
       ) : null}

@@ -2,8 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MULTIPLAYER_EVENTS } from "./events";
+import { toFriendlyGameMessage, toFriendlyLobbyMessage } from "./messages";
 import { emitWithAck, getLobbySocket } from "./socket-client";
-import { clearLobbySession, loadLobbySession, saveGameSnapshot, saveLobbySession, saveRoomSnapshot } from "./session";
+import {
+  clearLobbySession,
+  loadGameSnapshot,
+  loadLobbySession,
+  saveGameSnapshot,
+  saveLobbySession,
+  saveRoomSnapshot,
+} from "./session";
 import {
   GameFinishedPayload,
   GameStartedPayload,
@@ -16,6 +25,7 @@ import {
   PlayerDisconnectedPayload,
   PrivateHandPayload,
   PublicGameState,
+  RestartGameRequest,
 } from "./types";
 import { normalizeRoomCode } from "./utils";
 
@@ -26,14 +36,22 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
   const router = useRouter();
   const normalizedRouteCode = useMemo(() => normalizeRoomCode(roomCodeFromRoute), [roomCodeFromRoute]);
   const initialSession = useMemo(() => loadLobbySession(), []);
+  const initialSnapshot = useMemo(() => loadGameSnapshot(), []);
   const feedbackTimeoutRef = useRef<number | null>(null);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [gameState, setGameState] = useState<PublicGameState | null>(null);
+  const [gameState, setGameState] = useState<PublicGameState | null>(
+    initialSnapshot?.room.code === normalizedRouteCode ? initialSnapshot.state : null,
+  );
+  const [isRestartingRound, setIsRestartingRound] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const [privateHand, setPrivateHand] = useState<PrivateHandPayload["hand"]>([]);
-  const [room, setRoom] = useState<LobbyRoom | null>(null);
+  const [privateHand, setPrivateHand] = useState<PrivateHandPayload["hand"]>(
+    initialSnapshot?.room.code === normalizedRouteCode ? initialSnapshot.privateHand : [],
+  );
+  const [room, setRoom] = useState<LobbyRoom | null>(
+    initialSnapshot?.room.code === normalizedRouteCode ? initialSnapshot.room : null,
+  );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const currentPlayerId =
@@ -51,6 +69,12 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
       feedbackTimeoutRef.current = null;
     }, 2600);
   };
+
+  useEffect(() => {
+    if (room && currentPlayerId) {
+      saveGameSnapshot(room, currentPlayerId, gameState, privateHand);
+    }
+  }, [currentPlayerId, gameState, privateHand, room]);
 
   useEffect(() => {
     if (!currentPlayerId || !initialSession) {
@@ -93,8 +117,9 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
       setRoom(nextRoom);
       setGameState(state);
+      setPrivateHand([]);
       setPendingAction(null);
-      saveGameSnapshot(nextRoom, currentPlayerId);
+      setIsRestartingRound(false);
       saveRoomSnapshot(nextRoom, currentPlayerId);
     };
 
@@ -118,7 +143,7 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
     const handleInvalidMove = (payload: InvalidMovePayload) => {
       setPendingAction(null);
-      flashMessage(payload.message);
+      flashMessage(toFriendlyGameMessage(payload.message));
     };
 
     const handlePlayerDisconnected = (payload: PlayerDisconnectedPayload) => {
@@ -128,8 +153,8 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
       flashMessage(
         payload.playerId === currentPlayerId
-          ? "You disconnected from the room."
-          : `${payload.playerName} ${payload.reason === "leave" ? "left the room." : "disconnected."}`,
+          ? "Your seat disconnected. Rejoining your room now..."
+          : `${payload.playerName} ${payload.reason === "leave" ? "left the table." : "disconnected and may reconnect."}`,
       );
     };
 
@@ -140,15 +165,17 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
       setGameState(payload.state);
       setPendingAction(null);
+      setIsRestartingRound(false);
     };
 
     const handleErrorMessage = (message: string) => {
       setPendingAction(null);
-      flashMessage(message);
+      flashMessage(toFriendlyGameMessage(message));
     };
 
     const handleDisconnect = () => {
       setConnectionState("reconnecting");
+      flashMessage("Connection lost. Trying to rejoin your seat...");
     };
 
     const handleConnect = () => {
@@ -158,7 +185,7 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
     const handleConnectError = () => {
       setConnectionState("offline");
-      flashMessage("We could not reconnect to the game server.");
+      flashMessage("We couldn't reconnect to the game server yet.");
     };
 
     const resumeSession = async () => {
@@ -170,16 +197,19 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
         return;
       }
 
-      const response = await emitWithAck<{ player: { id: string }; room: LobbyRoom }, JoinRoomRequest>("resumeSession", {
-        name: latestSession.name,
-        playerId: latestSession.playerId,
-        preferredSeatIndex: latestSession.seatIndex,
-        roomCode: latestSession.roomCode,
-      } satisfies JoinRoomRequest);
+      const response = await emitWithAck<{ player: { id: string }; room: LobbyRoom }, JoinRoomRequest>(
+        MULTIPLAYER_EVENTS.resumeSession,
+        {
+          name: latestSession.name,
+          playerId: latestSession.playerId,
+          preferredSeatIndex: latestSession.seatIndex,
+          roomCode: latestSession.roomCode,
+        } satisfies JoinRoomRequest,
+      );
 
       if (!response.ok || !response.data) {
         setConnectionState("offline");
-        setFeedbackMessage(response.error ?? "Unable to restore this game session.");
+        setFeedbackMessage(toFriendlyLobbyMessage(response.error ?? "Unable to restore this game session."));
         return;
       }
 
@@ -190,14 +220,14 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
     socket.on("connect", handleConnect);
     socket.on("connect_error", handleConnectError);
     socket.on("disconnect", handleDisconnect);
-    socket.on("roomUpdated", handleRoomUpdated);
-    socket.on("gameStarted", handleGameStarted);
-    socket.on("gameStateUpdated", handleGameStateUpdated);
-    socket.on("privateHandUpdated", handlePrivateHandUpdated);
-    socket.on("invalidMove", handleInvalidMove);
-    socket.on("playerDisconnected", handlePlayerDisconnected);
-    socket.on("gameFinished", handleGameFinished);
-    socket.on("errorMessage", handleErrorMessage);
+    socket.on(MULTIPLAYER_EVENTS.roomUpdated, handleRoomUpdated);
+    socket.on(MULTIPLAYER_EVENTS.roundStarted, handleGameStarted);
+    socket.on(MULTIPLAYER_EVENTS.gameStateUpdated, handleGameStateUpdated);
+    socket.on(MULTIPLAYER_EVENTS.privateHandUpdated, handlePrivateHandUpdated);
+    socket.on(MULTIPLAYER_EVENTS.invalidMove, handleInvalidMove);
+    socket.on(MULTIPLAYER_EVENTS.playerDisconnected, handlePlayerDisconnected);
+    socket.on(MULTIPLAYER_EVENTS.gameFinished, handleGameFinished);
+    socket.on(MULTIPLAYER_EVENTS.errorMessage, handleErrorMessage);
 
     if (!socket.connected) {
       socket.connect();
@@ -214,14 +244,14 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
       socket.off("connect", handleConnect);
       socket.off("connect_error", handleConnectError);
       socket.off("disconnect", handleDisconnect);
-      socket.off("roomUpdated", handleRoomUpdated);
-      socket.off("gameStarted", handleGameStarted);
-      socket.off("gameStateUpdated", handleGameStateUpdated);
-      socket.off("privateHandUpdated", handlePrivateHandUpdated);
-      socket.off("invalidMove", handleInvalidMove);
-      socket.off("playerDisconnected", handlePlayerDisconnected);
-      socket.off("gameFinished", handleGameFinished);
-      socket.off("errorMessage", handleErrorMessage);
+      socket.off(MULTIPLAYER_EVENTS.roomUpdated, handleRoomUpdated);
+      socket.off(MULTIPLAYER_EVENTS.roundStarted, handleGameStarted);
+      socket.off(MULTIPLAYER_EVENTS.gameStateUpdated, handleGameStateUpdated);
+      socket.off(MULTIPLAYER_EVENTS.privateHandUpdated, handlePrivateHandUpdated);
+      socket.off(MULTIPLAYER_EVENTS.invalidMove, handleInvalidMove);
+      socket.off(MULTIPLAYER_EVENTS.playerDisconnected, handlePlayerDisconnected);
+      socket.off(MULTIPLAYER_EVENTS.gameFinished, handleGameFinished);
+      socket.off(MULTIPLAYER_EVENTS.errorMessage, handleErrorMessage);
     };
   }, [currentPlayerId, initialSession, normalizedRouteCode, router]);
 
@@ -232,11 +262,11 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
   const playCards = async (cardIds: string[]) => {
     if (!currentPlayerId || pendingAction) {
-      return;
+      return false;
     }
 
     setPendingAction("play");
-    const response = await emitWithAck<PublicGameState, PlayCardsRequest>("playCards", {
+    const response = await emitWithAck<PublicGameState, PlayCardsRequest>(MULTIPLAYER_EVENTS.playCards, {
       cardIds,
       playerId: currentPlayerId,
       roomCode: normalizedRouteCode,
@@ -246,18 +276,22 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
       setPendingAction(null);
 
       if (response.error) {
-        flashMessage(response.error);
+        flashMessage(toFriendlyGameMessage(response.error));
       }
+
+      return false;
     }
+
+    return true;
   };
 
   const passTurn = async () => {
     if (!currentPlayerId || pendingAction) {
-      return;
+      return false;
     }
 
     setPendingAction("pass");
-    const response = await emitWithAck<PublicGameState, PassTurnRequest>("passTurn", {
+    const response = await emitWithAck<PublicGameState, PassTurnRequest>(MULTIPLAYER_EVENTS.passTurn, {
       playerId: currentPlayerId,
       roomCode: normalizedRouteCode,
     });
@@ -266,8 +300,29 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
       setPendingAction(null);
 
       if (response.error) {
-        flashMessage(response.error);
+        flashMessage(toFriendlyGameMessage(response.error));
       }
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const restartRound = async () => {
+    if (!currentPlayerId || !room) {
+      return;
+    }
+
+    setIsRestartingRound(true);
+    const response = await emitWithAck<GameStartedPayload, RestartGameRequest>(MULTIPLAYER_EVENTS.restartGame, {
+      playerId: currentPlayerId,
+      roomCode: normalizedRouteCode,
+    });
+
+    if (!response.ok) {
+      setIsRestartingRound(false);
+      flashMessage(toFriendlyGameMessage(response.error ?? "Unable to deal a new round."));
     }
   };
 
@@ -278,7 +333,7 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
       return;
     }
 
-    await emitWithAck<{ ok: true }, LeaveRoomRequest>("leaveRoom", {
+    await emitWithAck<{ ok: true }, LeaveRoomRequest>(MULTIPLAYER_EVENTS.leaveRoom, {
       playerId: currentPlayerId,
       roomCode: normalizedRouteCode,
     });
@@ -292,11 +347,13 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
     currentPlayerId,
     feedbackMessage,
     gameState,
+    isRestartingRound,
     leaveRoom,
     passTurn,
     pendingAction,
     playCards,
     privateHand,
+    restartRound,
     room,
     roomCode: normalizedRouteCode,
     selectedIds,

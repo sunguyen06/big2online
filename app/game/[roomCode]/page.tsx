@@ -1,4 +1,4 @@
-import { GamePlaceholderPage } from "@/components/lobby/GamePlaceholderPage";
+import { MultiplayerGamePage } from "@/components/multiplayer/MultiplayerGamePage";
 
 export default async function GamePage({
   params,
@@ -7,5 +7,5 @@ export default async function GamePage({
 }) {
   const { roomCode } = await params;
 
-  return <GamePlaceholderPage roomCode={roomCode} />;
+  return <MultiplayerGamePage roomCode={roomCode} />;
 }

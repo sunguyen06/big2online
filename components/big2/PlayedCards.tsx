@@ -21,10 +21,10 @@ export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsPro
   const origin = originBySeat[seat];
 
   return (
-    <div className="glass-panel min-h-[200px] rounded-[2rem] border-white/10 p-5 sm:p-6">
+    <div className="glass-panel min-h-[220px] rounded-[2rem] border-white/10 p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-100/58">Current Trick</p>
+          <p className="panel-label">Current Trick</p>
           <p className="text-lg font-semibold text-white">{move ? playerName : "Open Table"}</p>
         </div>
         <div className="rounded-full border border-white/8 bg-white/6 px-3 py-1 text-xs text-slate-200/75">
@@ -32,7 +32,7 @@ export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsPro
         </div>
       </div>
 
-      <div className="grid min-h-[118px] place-items-center">
+      <div className="grid min-h-[132px] place-items-center rounded-[1.6rem] border border-white/6 bg-black/10 px-3 py-4">
         <AnimatePresence mode="wait">
           {move ? (
             <motion.div
@@ -49,7 +49,7 @@ export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsPro
                   animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
                   transition={{ duration: 0.42, delay: index * 0.04, type: "spring", stiffness: 280, damping: 28 }}
                 >
-                  <PlayingCard card={card} size="sm" />
+                  <PlayingCard animationKey={`${move.summary}-${card.id}`} card={card} size="sm" />
                 </motion.div>
               ))}
             </motion.div>

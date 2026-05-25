@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +16,13 @@ const backendCommand = isWindows
 
 const children = [];
 let isShuttingDown = false;
+
+async function clearDevArtifacts() {
+  // Clear stale Next build artifacts that can survive a crash and point dev
+  // requests at missing chunk ids on the next boot.
+  await rm(path.join(rootDir, ".next"), { force: true, recursive: true });
+  await rm(path.join(rootDir, "tsconfig.tsbuildinfo"), { force: true });
+}
 
 function spawnService(name, command, args, extraEnv = {}) {
   const child = isWindows
@@ -68,6 +76,8 @@ function shutdown(exitCode = 0) {
 
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
+
+await clearDevArtifacts();
 
 console.log("> Starting frontend on http://localhost:3000");
 console.log("> Starting lobby backend on http://localhost:8000");

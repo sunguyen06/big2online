@@ -1,5 +1,7 @@
 "use client";
 
+import { MULTIPLAYER_EVENTS } from "./events";
+import { toFriendlyLobbyMessage } from "./messages";
 import { CreateRoomRequest, JoinRoomRequest, LobbyJoinSuccess } from "./types";
 import { emitWithAck, getLobbySocket } from "./socket-client";
 import { clearLobbySession, saveLobbySession, saveRoomSnapshot } from "./session";
@@ -57,7 +59,7 @@ function persistJoinResult(data: LobbyJoinSuccess) {
 export async function createRoomSession(request: CreateRoomRequest) {
   try {
     await ensureSocketConnected();
-    const response = await emitWithAck<LobbyJoinSuccess, CreateRoomRequest>("createRoom", {
+    const response = await emitWithAck<LobbyJoinSuccess, CreateRoomRequest>(MULTIPLAYER_EVENTS.createRoom, {
       ...request,
       name: sanitizeDisplayName(request.name),
     });
@@ -65,7 +67,7 @@ export async function createRoomSession(request: CreateRoomRequest) {
     if (!response.ok || !response.data) {
       clearLobbySession();
       return {
-        error: response.error ?? "Unable to create a room right now.",
+        error: toFriendlyLobbyMessage(response.error ?? "Unable to create a room right now."),
         ok: false as const,
       };
     }
@@ -78,7 +80,9 @@ export async function createRoomSession(request: CreateRoomRequest) {
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Unable to connect to the lobby server.",
+      error: toFriendlyLobbyMessage(
+        error instanceof Error ? error.message : "Unable to connect to the lobby server.",
+      ),
       ok: false as const,
     };
   }
@@ -87,7 +91,7 @@ export async function createRoomSession(request: CreateRoomRequest) {
 export async function joinRoomSession(request: JoinRoomRequest) {
   try {
     await ensureSocketConnected();
-    const response = await emitWithAck<LobbyJoinSuccess, JoinRoomRequest>("joinRoom", {
+    const response = await emitWithAck<LobbyJoinSuccess, JoinRoomRequest>(MULTIPLAYER_EVENTS.joinRoom, {
       ...request,
       name: sanitizeDisplayName(request.name),
       roomCode: normalizeRoomCode(request.roomCode),
@@ -95,7 +99,7 @@ export async function joinRoomSession(request: JoinRoomRequest) {
 
     if (!response.ok || !response.data) {
       return {
-        error: response.error ?? "Unable to join that room.",
+        error: toFriendlyLobbyMessage(response.error ?? "Unable to join that room."),
         ok: false as const,
       };
     }
@@ -108,7 +112,9 @@ export async function joinRoomSession(request: JoinRoomRequest) {
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Unable to connect to the lobby server.",
+      error: toFriendlyLobbyMessage(
+        error instanceof Error ? error.message : "Unable to connect to the lobby server.",
+      ),
       ok: false as const,
     };
   }

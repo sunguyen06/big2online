@@ -16,6 +16,7 @@ import {
   PlayerDisconnectedPayload,
   PrivateHandPayload,
   PublicGameState,
+  RestartGameRequest,
   RecentGameAction,
 } from "@/lib/multiplayer/types";
 import { createRoomCode, normalizeRoomCode, ROOM_CAPACITY, sanitizeDisplayName } from "./utils";
@@ -209,32 +210,30 @@ export class LobbyRoomStore {
       throw new Error("You need 4 connected players before starting.");
     }
 
-    const state = setPhase(
-      createGameStateForPlayers(
-        room.players.map((entry, index) => ({
-          id: index,
-          kind: "human",
-          name: entry.name,
-          seat: SEAT_BY_INDEX[index],
-        })),
-      ),
-      "playing",
-    );
+    return this.beginRound(room, playerId);
+  }
 
-    room.status = "game";
-    room.game = {
-      lastAction: null,
-      playerOrder: room.players.map((entry) => entry.id),
-      playersPassed: [],
-      startedAt: Date.now(),
-      state,
-    };
+  restartGame(roomCode: string, playerId: RestartGameRequest["playerId"]): GameStartedPayload {
+    const room = this.getRoomOrThrow(roomCode);
+    const player = room.players.find((entry) => entry.id === playerId);
 
-    return {
-      room: this.toSnapshot(room),
-      startedByPlayerId: playerId,
-      state: this.toPublicGameState(room),
-    };
+    if (!player) {
+      throw new Error("You are no longer in that room.");
+    }
+
+    if (!player.isHost) {
+      throw new Error("Only the host can start a new round.");
+    }
+
+    if (!room.game || room.game.state.status !== "ended") {
+      throw new Error("Finish the current round before dealing another one.");
+    }
+
+    if (room.players.length !== ROOM_CAPACITY || room.players.some((entry) => !entry.connected)) {
+      throw new Error("You need 4 connected players before starting.");
+    }
+
+    return this.beginRound(room, playerId);
   }
 
   playCards(roomCode: string, playerId: string, cardIds: string[]) {
@@ -493,6 +492,7 @@ export class LobbyRoomStore {
 
     player.connected = false;
     player.socketId = "";
+    this.reassignHost(room, true);
 
     if (room.players.every((entry) => !entry.connected)) {
       this.rooms.delete(room.code);
@@ -526,6 +526,35 @@ export class LobbyRoomStore {
     if (room.status !== "lobby") {
       throw new Error("That room has already started its game.");
     }
+  }
+
+  private beginRound(room: RoomState, playerId: string): GameStartedPayload {
+    const state = setPhase(
+      createGameStateForPlayers(
+        room.players.map((entry, index) => ({
+          id: index,
+          kind: "human",
+          name: entry.name,
+          seat: SEAT_BY_INDEX[index],
+        })),
+      ),
+      "playing",
+    );
+
+    room.status = "game";
+    room.game = {
+      lastAction: null,
+      playerOrder: room.players.map((entry) => entry.id),
+      playersPassed: [],
+      startedAt: Date.now(),
+      state,
+    };
+
+    return {
+      room: this.toSnapshot(room),
+      startedByPlayerId: playerId,
+      state: this.toPublicGameState(room),
+    };
   }
 
   private getNextSeat(room: RoomState, preferredSeatIndex?: number) {
@@ -601,8 +630,11 @@ export class LobbyRoomStore {
     return message;
   }
 
-  private reassignHost(room: RoomState) {
-    const hostPlayerId = room.players[0]?.id ?? null;
+  private reassignHost(room: RoomState, preferConnected = false) {
+    const hostPlayerId =
+      (preferConnected ? room.players.find((player) => player.connected)?.id : null) ??
+      room.players[0]?.id ??
+      null;
 
     room.players = room.players.map((player) => ({
       ...player,

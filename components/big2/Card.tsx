@@ -15,6 +15,7 @@ interface CardProps {
   delay?: number;
   initialOffset?: { x?: number; y?: number; rotate?: number };
   className?: string;
+  animationKey?: number | string;
 }
 
 const sizeClasses = {
@@ -33,6 +34,7 @@ export function Card({
   delay = 0,
   initialOffset,
   className = "",
+  animationKey,
 }: CardProps) {
   const isRed = card?.suit === 0 || card?.suit === 2;
   const label = card ? getCardLabel(card) : "";
@@ -58,7 +60,7 @@ export function Card({
             Placeholder card back:
             replace this patterned div with a real back image later if desired.
           */}
-          <div className="absolute inset-[10%] rounded-[1rem] border border-sky-100/20 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_35%),repeating-linear-gradient(135deg,_rgba(255,255,255,0.08)_0,_rgba(255,255,255,0.08)_6px,_transparent_6px,_transparent_12px),linear-gradient(180deg,rgba(28,98,129,0.9),rgba(10,37,54,0.95))]" />
+          <div className="absolute inset-[10%] rounded-[1rem] border border-sky-100/20 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_35%),repeating-linear-gradient(135deg,_rgba(255,255,255,0.08)_0,_rgba(255,255,255,0.08)_6px,_transparent_6px,_transparent_12px),repeating-linear-gradient(45deg,_rgba(255,255,255,0.04)_0,_rgba(255,255,255,0.04)_5px,_transparent_5px,_transparent_10px),linear-gradient(180deg,rgba(28,98,129,0.9),rgba(10,37,54,0.95))]" />
           <div className="absolute inset-0 grid place-items-center">
             <div className="relative h-12 w-12 rounded-full border border-white/20 bg-white/8">
               <div className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[0.7rem] border border-sky-100/24 bg-white/6" />
@@ -68,6 +70,10 @@ export function Card({
         </>
       ) : (
         <>
+          {/*
+            Placeholder face rendering:
+            replace this rank/suit layout with real card face image assets later if needed.
+          */}
           {playable && !selected ? (
             <div className="pointer-events-none absolute inset-x-5 top-2 rounded-full border border-amber-300/45 bg-amber-200/26 px-2 py-0.5 text-center text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-950/80">
               Playable
@@ -121,6 +127,7 @@ export function Card({
   if (interactive && onClick) {
     return (
       <motion.button
+        key={animationKey}
         type="button"
         onClick={onClick}
         className="relative rounded-[1.25rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
@@ -131,5 +138,9 @@ export function Card({
     );
   }
 
-  return <motion.div {...animationProps}>{frame}</motion.div>;
+  return (
+    <motion.div key={animationKey} {...animationProps}>
+      {frame}
+    </motion.div>
+  );
 }

@@ -1,64 +1,88 @@
 # Big 2 Royale
 
-A polished Big 2 app built with Next.js, React, TypeScript, Tailwind CSS, Framer Motion, and Socket.IO.
+Big 2 Royale is a polished private-room Big 2 prototype built for four real players in separate browser windows. It focuses on a premium felt-table presentation, real-time room flow, and a clean split between multiplayer state management and UI.
+
+## Tech Stack
+
+- Next.js 15
+- React 19
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- Socket.IO
+
+## Project Overview
+
+- `/` is the multiplayer landing page for creating or joining a private room
+- `/room/[roomCode]` is the real-time lobby with live seats, host controls, and room sharing
+- `/game/[roomCode]` is the shared multiplayer card table
+- `/solo` is the local single-player prototype against CPU seats
+
+The frontend runs alongside a small Socket.IO backend in `server.ts`. The backend owns room membership, round state, private hands, turn validation, and reconnect-aware session restoration.
+
+## Setup
+
+```bash
+npm install
+```
+
+If PowerShell blocks the `npm` shim on your machine, use `npm.cmd` instead.
 
 ## Run Locally
 
 ```bash
-npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+This starts:
 
-`npm run dev` starts:
+- the Next.js frontend at [http://localhost:3000](http://localhost:3000)
+- the Socket.IO room server at `http://localhost:8000`
 
-- the Next.js frontend on `http://localhost:3000`
-- the Socket.IO lobby backend on `http://localhost:8000`
+Production build commands:
 
-If PowerShell blocks the `npm` shim on your machine, run `npm.cmd run dev` instead.
+```bash
+npm run build
+npm run start
+```
 
-## Routes
+## Testing
 
-- `/`: multiplayer home and private room entry
-- `/room/[roomCode]`: real-time lobby
-- `/game/[roomCode]`: multiplayer game placeholder
-- `/solo`: existing single-player prototype against CPU opponents
+```bash
+npm run test:big2
+```
 
-## Multiplayer Lobby Features
+## Multiplayer Notes
 
-- Players must enter a display name before creating or joining
-- Private room codes are short uppercase strings
 - Rooms support exactly 4 seats
-- First player becomes host
-- Only the host can start the game
-- Start Game is locked until 4 connected players are present
-- Lobby player lists update in real time through Socket.IO
-- Host is reassigned automatically if the current host disconnects
-- Empty rooms are deleted from memory automatically
-- Session storage is used so a refresh can try to restore the same room session
+- The host can only start a round when all 4 seats are filled and connected
+- Each browser only receives its own private hand
+- Refreshing a tab attempts to restore the same saved seat
+- If a player disconnects during a round, their seat is marked disconnected and the table shows reconnect guidance
+- Hosts can deal a new round after a hand ends, as long as all 4 players are connected again
 
-## Project Structure
+## Current Limitations
 
-- `server.ts`: standalone Socket.IO lobby backend on port `8000`
-- `scripts/dev.mjs`: local dev runner that starts frontend + backend together
-- `scripts/start.mjs`: local production runner that starts frontend + backend together
-- `lib/multiplayer/*`: room store, socket helpers, session helpers, shared lobby types
-- `components/lobby/*`: home, room lobby, and game placeholder UI
-- `components/big2/*`: reusable single-player card table UI
-- `lib/big2/*`: single-player game rules and CPU logic
+- Room state lives in memory, so restarting the backend clears active rooms
+- Reconnect support restores saved seats, but there is no full in-round substitute or takeover flow yet
+- If a disconnected player never returns, the host currently needs to reset the room manually
+- The current straight rule assumption is fixed to `3-4-5-6-7` through `10-J-Q-K-A`
 
 ## Placeholder Assets
 
-This version intentionally uses CSS-based placeholders instead of final art.
+This build intentionally uses CSS placeholders so art can be swapped in later.
 
-- Card faces are rendered from rank and suit text like `A♠`
-- Card backs use a CSS pattern in `components/big2/Card.tsx`
-- Avatars and table panels are CSS-driven for easy swapping later
-- Search for comments mentioning `Placeholder` when you are ready to replace visuals
+- Card face placeholder: [components/big2/Card.tsx](/C:/Users/nguye/big2online/components/big2/Card.tsx)
+- Card back placeholder: [components/big2/Card.tsx](/C:/Users/nguye/big2online/components/big2/Card.tsx)
+- Avatar placeholder circles: [components/big2/PlayerSeat.tsx](/C:/Users/nguye/big2online/components/big2/PlayerSeat.tsx) and [components/lobby/LobbySeatCard.tsx](/C:/Users/nguye/big2online/components/lobby/LobbySeatCard.tsx)
 
-## Notes
+Search for comments mentioning `Placeholder` to find the intended swap points for future art assets.
 
-- The multiplayer room store is currently in-memory, so restarting the lobby backend clears all rooms
-- The `/game/[roomCode]` route is still a placeholder and receives room and player data from the lobby transition
-- The solo Big 2 rules implementation still lives under `/solo`
+## Big 2 Rule Assumptions
+
+- Rank order is `3 < 4 < 5 < 6 < 7 < 8 < 9 < 10 < J < Q < K < A < 2`
+- Suit order is `Diamonds < Clubs < Hearts < Spades`
+- Supported hand types are singles, pairs, triples, straights, flushes, full houses, four of a kind, and straight flushes
+- Five-card ranking is `Straight < Flush < Full House < Four of a Kind < Straight Flush`
+- The opening move must include the 3 of Diamonds
+- Passing is not allowed while starting a fresh trick

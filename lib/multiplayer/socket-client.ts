@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import { SocketAck } from "./types";
 
 let lobbySocket: Socket | null = null;
+const DEFAULT_ACK_TIMEOUT_MS = 4500;
 
 function getLobbyServerUrl() {
   const configuredUrl = process.env.NEXT_PUBLIC_LOBBY_SERVER_URL?.trim();
@@ -35,6 +36,16 @@ export function emitWithAck<TResponse, TPayload>(event: string, payload: TPayloa
   const socket = getLobbySocket();
 
   return new Promise<SocketAck<TResponse>>((resolve) => {
-    socket.emit(event, payload, (response: SocketAck<TResponse>) => resolve(response));
+    const timeout = window.setTimeout(() => {
+      resolve({
+        error: "The server took too long to respond. Please try again.",
+        ok: false,
+      });
+    }, DEFAULT_ACK_TIMEOUT_MS);
+
+    socket.emit(event, payload, (response: SocketAck<TResponse>) => {
+      window.clearTimeout(timeout);
+      resolve(response);
+    });
   });
 }

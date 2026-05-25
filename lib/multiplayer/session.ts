@@ -1,6 +1,7 @@
 "use client";
 
-import { LobbyRoom, LobbySessionState, RoomStatus } from "./types";
+import { Card } from "@/lib/big2/types";
+import { LobbyRoom, LobbySessionState, PublicGameState } from "./types";
 
 const LOBBY_SESSION_KEY = "big2-lobby-session";
 const ROOM_SNAPSHOT_KEY = "big2-room-snapshot";
@@ -9,6 +10,11 @@ const GAME_SNAPSHOT_KEY = "big2-game-snapshot";
 interface StoredRoomSnapshot {
   currentPlayerId: string;
   room: LobbyRoom;
+}
+
+interface StoredGameSnapshot extends StoredRoomSnapshot {
+  privateHand: Card[];
+  state: PublicGameState | null;
 }
 
 export function loadLobbySession() {
@@ -80,14 +86,21 @@ export function loadRoomSnapshot() {
   }
 }
 
-export function saveGameSnapshot(room: LobbyRoom, currentPlayerId: string) {
+export function saveGameSnapshot(
+  room: LobbyRoom,
+  currentPlayerId: string,
+  state: PublicGameState | null = null,
+  privateHand: Card[] = [],
+) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const payload: StoredRoomSnapshot = {
+  const payload: StoredGameSnapshot = {
     currentPlayerId,
+    privateHand,
     room,
+    state,
   };
 
   window.sessionStorage.setItem(GAME_SNAPSHOT_KEY, JSON.stringify(payload));
@@ -105,22 +118,9 @@ export function loadGameSnapshot() {
   }
 
   try {
-    return JSON.parse(value) as StoredRoomSnapshot;
+    return JSON.parse(value) as StoredGameSnapshot;
   } catch {
     window.sessionStorage.removeItem(GAME_SNAPSHOT_KEY);
     return null;
   }
-}
-
-export function updateSessionStatus(status: RoomStatus) {
-  const current = loadLobbySession();
-
-  if (!current) {
-    return;
-  }
-
-  saveLobbySession({
-    ...current,
-    status,
-  });
 }

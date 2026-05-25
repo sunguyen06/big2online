@@ -99,7 +99,13 @@ export function PlayerSeat({
                 zIndex: index + 1,
               }}
             >
-              <PlayingCard faceDown size="sm" delay={0.08 * index} initialOffset={{ y: -20 + index * 5 }} />
+              <PlayingCard
+                animationKey={`${player.id}-back-${index}`}
+                faceDown
+                size="sm"
+                delay={0.08 * index}
+                initialOffset={{ y: -20 + index * 5 }}
+              />
             </div>
           ))}
         </div>

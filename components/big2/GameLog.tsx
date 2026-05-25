@@ -17,7 +17,7 @@ export function GameLog({ log }: GameLogProps) {
   return (
     <div className="glass-panel flex h-full min-h-[280px] flex-col rounded-[1.75rem] p-4 sm:p-5">
       <div className="mb-4">
-        <p className="text-[11px] uppercase tracking-[0.26em] text-emerald-100/55">Recent Action</p>
+        <p className="panel-label">Recent Action</p>
         <h2 className="mt-1 text-xl font-semibold text-white">Game Log</h2>
       </div>
 

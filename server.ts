@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
+import { MULTIPLAYER_EVENTS } from "./lib/multiplayer/events";
 import { LobbyRoomStore } from "./lib/multiplayer/room-store";
 import {
   CreateRoomRequest,
@@ -12,6 +13,7 @@ import {
   PlayCardsRequest,
   PrivateHandPayload,
   PublicGameState,
+  RestartGameRequest,
   SocketAck,
   StartGameRequest,
 } from "./lib/multiplayer/types";
@@ -44,19 +46,19 @@ const io = new SocketIOServer(httpServer, {
 });
 
 const emitRoomUpdate = (room: LobbyRoom) => {
-  io.to(room.code).emit("roomUpdated", room);
+  io.to(room.code).emit(MULTIPLAYER_EVENTS.roomUpdated, room);
 };
 
 const emitError = (socketId: string, message: string) => {
-  io.to(socketId).emit("errorMessage", message);
+  io.to(socketId).emit(MULTIPLAYER_EVENTS.errorMessage, message);
 };
 
 const emitInvalidMove = (socketId: string, message: string) => {
-  io.to(socketId).emit("invalidMove", { message });
+  io.to(socketId).emit(MULTIPLAYER_EVENTS.invalidMove, { message });
 };
 
 const emitGameState = (roomCode: string, state: PublicGameState) => {
-  io.to(roomCode).emit("gameStateUpdated", state);
+  io.to(roomCode).emit(MULTIPLAYER_EVENTS.gameStateUpdated, state);
 };
 
 const emitPrivateHand = (payload: PrivateHandPayload) => {
@@ -67,7 +69,7 @@ const emitPrivateHand = (payload: PrivateHandPayload) => {
     return;
   }
 
-  io.to(player.socketId).emit("privateHandUpdated", payload);
+  io.to(player.socketId).emit(MULTIPLAYER_EVENTS.privateHandUpdated, payload);
 };
 
 const emitAllPrivateHands = (room: LobbyRoom) => {
@@ -151,7 +153,7 @@ const detachSocketFromTrackedRoom = (socketId: string) => {
   }
 
   if (removal.disconnectEvent) {
-    io.to(removal.room.code).emit("playerDisconnected", removal.disconnectEvent);
+    io.to(removal.room.code).emit(MULTIPLAYER_EVENTS.playerDisconnected, removal.disconnectEvent);
   }
 
   emitRoomUpdate(removal.room);
@@ -170,7 +172,7 @@ const validateActingPlayer = (socketId: string, playerId: string) => {
 };
 
 io.on("connection", (socket) => {
-  socket.on("createRoom", (payload: CreateRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.createRoom, (payload: CreateRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
     const name = sanitizeDisplayName(payload.name);
     const nameValidation = validateDisplayName(name);
 
@@ -190,7 +192,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("joinRoom", (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.joinRoom, (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
     const name = sanitizeDisplayName(payload.name);
     const nameValidation = validateDisplayName(name);
     const roomCodeValidation = validateRoomCode(payload.roomCode);
@@ -222,7 +224,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("resumeSession", (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.resumeSession, (payload: JoinRoomRequest, ack: (response: SocketAck<LobbyJoinSuccess>) => void) => {
     const name = sanitizeDisplayName(payload.name);
     const nameValidation = validateDisplayName(name);
     const roomCodeValidation = validateRoomCode(payload.roomCode);
@@ -262,12 +264,12 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("startGame", (payload: StartGameRequest, ack: (response: SocketAck<GameStartedPayload>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.startGame, (payload: StartGameRequest, ack: (response: SocketAck<GameStartedPayload>) => void) => {
     try {
       validateActingPlayer(socket.id, payload.playerId);
       const result = store.startGame(payload.roomCode, payload.playerId);
       succeed(ack, result);
-      io.to(result.room.code).emit("gameStarted", result);
+      io.to(result.room.code).emit(MULTIPLAYER_EVENTS.roundStarted, result);
       emitRoomUpdate(result.room);
       emitGameBundle(result.room.code, result.state);
     } catch (error) {
@@ -275,7 +277,20 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("playCards", (payload: PlayCardsRequest, ack: (response: SocketAck<PublicGameState>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.restartGame, (payload: RestartGameRequest, ack: (response: SocketAck<GameStartedPayload>) => void) => {
+    try {
+      validateActingPlayer(socket.id, payload.playerId);
+      const result = store.restartGame(payload.roomCode, payload.playerId);
+      succeed(ack, result);
+      io.to(result.room.code).emit(MULTIPLAYER_EVENTS.roundStarted, result);
+      emitRoomUpdate(result.room);
+      emitGameBundle(result.room.code, result.state);
+    } catch (error) {
+      fail(ack, socket.id, error instanceof Error ? error.message : "Unable to deal a new round.");
+    }
+  });
+
+  socket.on(MULTIPLAYER_EVENTS.playCards, (payload: PlayCardsRequest, ack: (response: SocketAck<PublicGameState>) => void) => {
     try {
       validateActingPlayer(socket.id, payload.playerId);
       const result = store.playCards(payload.roomCode, payload.playerId, payload.cardIds);
@@ -283,7 +298,7 @@ io.on("connection", (socket) => {
       emitGameBundle(result.room.code, result.state!);
 
       if (result.finished) {
-        io.to(result.room.code).emit("gameFinished", result.finished);
+        io.to(result.room.code).emit(MULTIPLAYER_EVENTS.gameFinished, result.finished);
       }
     } catch (error) {
       if (error instanceof Error && "code" in error && (error as { code?: string }).code === "INVALID_MOVE") {
@@ -296,7 +311,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("passTurn", (payload: PassTurnRequest, ack: (response: SocketAck<PublicGameState>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.passTurn, (payload: PassTurnRequest, ack: (response: SocketAck<PublicGameState>) => void) => {
     try {
       validateActingPlayer(socket.id, payload.playerId);
       const result = store.passTurn(payload.roomCode, payload.playerId);
@@ -313,14 +328,14 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leaveRoom", (payload: LeaveRoomRequest, ack: (response: SocketAck<{ ok: true }>) => void) => {
+  socket.on(MULTIPLAYER_EVENTS.leaveRoom, (payload: LeaveRoomRequest, ack: (response: SocketAck<{ ok: true }>) => void) => {
     try {
       validateActingPlayer(socket.id, payload.playerId);
       const result = store.leaveRoom(payload.roomCode, payload.playerId, socket.id);
       succeed(ack, { ok: true });
 
       if (result.disconnectEvent && result.room) {
-        io.to(result.room.code).emit("playerDisconnected", result.disconnectEvent);
+        io.to(result.room.code).emit(MULTIPLAYER_EVENTS.playerDisconnected, result.disconnectEvent);
         emitRoomUpdate(result.room);
 
         if (result.state) {
@@ -340,7 +355,7 @@ io.on("connection", (socket) => {
     }
 
     if (removal.disconnectEvent && removal.room) {
-      io.to(removal.room.code).emit("playerDisconnected", removal.disconnectEvent);
+      io.to(removal.room.code).emit(MULTIPLAYER_EVENTS.playerDisconnected, removal.disconnectEvent);
       emitRoomUpdate(removal.room);
 
       if (removal.state) {

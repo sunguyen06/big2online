@@ -18,12 +18,19 @@ import {
   setPhase,
 } from "@/lib/big2/engine";
 import { GameState } from "@/lib/big2/types";
+import { useUiSoundEffects } from "@/lib/ui/useUiSoundEffects";
 
 const DEALING_DELAY_MS = 1500;
 
 export function Big2Game() {
   const [game, setGame] = useState<GameState | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastPlayedLogId, setLastPlayedLogId] = useState<string | null>(null);
+
+  const { playCardPlaySound, playCardSelectSound } = useUiSoundEffects({
+    isPlayersTurn: !!game && game.phase === "playing" && game.winner === null && game.currentPlayer === 0,
+    turnCueEnabled: !!game,
+  });
 
   useEffect(() => {
     setGame(createInitialGameState());
@@ -52,6 +59,25 @@ export function Big2Game() {
 
     setSelectedIds([]);
   }, [game]);
+
+  useEffect(() => {
+    if (!game) {
+      return;
+    }
+
+    const latestLogEntry = game.log[0];
+
+    if (!latestLogEntry || latestLogEntry.tone !== "play") {
+      return;
+    }
+
+    if (latestLogEntry.id === lastPlayedLogId) {
+      return;
+    }
+
+    setLastPlayedLogId(latestLogEntry.id);
+    playCardPlaySound();
+  }, [game, lastPlayedLogId, playCardPlaySound]);
 
   useEffect(() => {
     if (!game) {
@@ -121,9 +147,15 @@ export function Big2Game() {
       return;
     }
 
+    const isSelecting = !selectedIds.includes(cardId);
+
     setSelectedIds((current) =>
       current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId],
     );
+
+    if (isSelecting) {
+      playCardSelectSound();
+    }
   };
 
   const handlePlay = () => {
@@ -144,6 +176,7 @@ export function Big2Game() {
 
   const handleRestart = () => {
     startTransition(() => {
+      setLastPlayedLogId(null);
       setSelectedIds([]);
       setGame(createInitialGameState());
     });

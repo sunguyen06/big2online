@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { RulesModal } from "@/components/big2/RulesModal";
 import { createRoomSession, joinRoomSession } from "@/lib/multiplayer/lobby-actions";
 import { loadLobbySession } from "@/lib/multiplayer/session";
 import { LobbySessionState } from "@/lib/multiplayer/types";
@@ -32,6 +33,7 @@ export function LobbyHomePage() {
   const [joinCode, setJoinCode] = useState("");
   const [feedback, setFeedback] = useState("");
   const [loadingMode, setLoadingMode] = useState<null | "create" | "join">(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   useEffect(() => {
     const storedSession = loadLobbySession();
@@ -100,6 +102,7 @@ export function LobbyHomePage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#061910] px-4 py-4 text-[#f5f1df]">
+      <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(35,115,76,0.38),transparent_28%),radial-gradient(circle_at_50%_80%,rgba(15,58,39,0.56),transparent_36%),linear-gradient(180deg,#07150f_0%,#0b261b_22%,#11422f_54%,#0a281d_78%,#07150f_100%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(255,255,255,0.04)_0.7px,transparent_0.7px)] [background-size:18px_18px]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,transparent_52%,rgba(0,0,0,0.28)_100%)]" />
@@ -155,7 +158,7 @@ export function LobbyHomePage() {
 
           <Link
             href="/solo"
-            className="rounded-full border border-[#d8bc70]/28 bg-black/15 px-4 py-2 text-sm font-semibold text-[#f6eed6] transition hover:bg-black/25"
+            className="ui-button ui-button-dark rounded-full px-4 py-2 text-sm font-semibold text-[#f6eed6]"
           >
             Solo Prototype
           </Link>
@@ -214,7 +217,7 @@ export function LobbyHomePage() {
                   type="button"
                   onClick={joinRoom}
                   disabled={loadingMode !== null}
-                  className="group relative w-full overflow-hidden rounded-[1.2rem] bg-[linear-gradient(180deg,#f2da98_0%,#d8bc70_48%,#a78035_100%)] px-6 py-4 font-['Georgia','Times_New_Roman',serif] text-[1.85rem] font-bold uppercase tracking-[0.08em] text-[#1a1407] shadow-[0_24px_55px_rgba(167,128,53,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="ui-button group relative w-full overflow-hidden rounded-[1.2rem] bg-[linear-gradient(180deg,#f2da98_0%,#d8bc70_48%,#a78035_100%)] px-6 py-4 font-['Georgia','Times_New_Roman',serif] text-[1.85rem] font-bold uppercase tracking-[0.08em] text-[#1a1407] shadow-[0_24px_55px_rgba(167,128,53,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span className="absolute inset-0 bg-[linear-gradient(120deg,transparent_30%,rgba(255,255,255,0.24),transparent_68%)] opacity-0 transition duration-500 group-hover:translate-x-10 group-hover:opacity-100" />
                   <span className="relative">
@@ -226,9 +229,17 @@ export function LobbyHomePage() {
                   type="button"
                   onClick={createRoom}
                   disabled={loadingMode !== null}
-                  className="w-full rounded-[1rem] border border-[#d8bc70]/20 bg-[#10261b]/82 px-4 py-3 text-sm font-semibold uppercase tracking-[0.22em] text-[#f2e8c9] transition hover:bg-[#163526] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="ui-button w-full rounded-[1rem] border border-[#d8bc70]/20 bg-[#10261b]/82 px-4 py-3 text-sm font-semibold uppercase tracking-[0.22em] text-[#f2e8c9] hover:bg-[#163526] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loadingMode === "create" ? "Creating..." : "Create Private Room"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRulesOpen(true)}
+                  className="ui-button ui-button-ghost w-full rounded-[1rem] px-4 py-3 text-sm font-semibold uppercase tracking-[0.22em]"
+                >
+                  Quick Rules
                 </button>
               </div>
             </div>

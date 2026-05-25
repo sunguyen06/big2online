@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { MULTIPLAYER_EVENTS } from "./events";
+import { toFriendlyLobbyMessage } from "./messages";
 import { emitWithAck, getLobbySocket } from "./socket-client";
 import {
   clearLobbySession,
@@ -11,7 +13,13 @@ import {
   saveLobbySession,
   saveRoomSnapshot,
 } from "./session";
-import { GameStartedPayload, JoinRoomRequest, LobbyRoom, StartGameRequest } from "./types";
+import {
+  GameStartedPayload,
+  JoinRoomRequest,
+  LeaveRoomRequest,
+  LobbyRoom,
+  StartGameRequest,
+} from "./types";
 import { normalizeRoomCode } from "./utils";
 
 type ConnectionState = "connected" | "connecting" | "offline" | "reconnecting";
@@ -24,6 +32,7 @@ export function useRoomLobby(roomCodeFromRoute: string) {
 
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLeavingRoom, setIsLeavingRoom] = useState(false);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [room, setRoom] = useState<LobbyRoom | null>(
     initialSnapshot?.room.code === normalizedRouteCode ? initialSnapshot.room : null,
@@ -42,6 +51,10 @@ export function useRoomLobby(roomCodeFromRoute: string) {
     const socket = getLobbySocket();
 
     const handleRoomUpdated = (nextRoom: LobbyRoom) => {
+      if (normalizeRoomCode(nextRoom.code) !== normalizedRouteCode) {
+        return;
+      }
+
       setRoom(nextRoom);
       saveRoomSnapshot(nextRoom, currentPlayerId);
 
@@ -58,19 +71,24 @@ export function useRoomLobby(roomCodeFromRoute: string) {
       }
 
       if (nextRoom.status === "game") {
-        saveGameSnapshot(nextRoom, currentPlayerId);
+        saveGameSnapshot(nextRoom, currentPlayerId, null, []);
         router.push(`/game/${nextRoom.code}`);
       }
     };
 
     const handleGameStarted = ({ room: nextRoom }: GameStartedPayload) => {
-      saveGameSnapshot(nextRoom, currentPlayerId);
+      if (normalizeRoomCode(nextRoom.code) !== normalizedRouteCode) {
+        return;
+      }
+
+      saveGameSnapshot(nextRoom, currentPlayerId, null, []);
       saveRoomSnapshot(nextRoom, currentPlayerId);
       router.push(`/game/${nextRoom.code}`);
     };
 
     const handleDisconnect = () => {
       setConnectionState("reconnecting");
+      setErrorMessage("Connection lost. Trying to restore your seat...");
     };
 
     const handleConnect = () => {
@@ -80,7 +98,7 @@ export function useRoomLobby(roomCodeFromRoute: string) {
 
     const handleConnectError = () => {
       setConnectionState("offline");
-      setErrorMessage("We could not reach the lobby server. Try refreshing in a moment.");
+      setErrorMessage("We couldn't reach the lobby server. Try refreshing in a moment.");
     };
 
     const resumeSession = async () => {
@@ -92,17 +110,20 @@ export function useRoomLobby(roomCodeFromRoute: string) {
         return;
       }
 
-      const response = await emitWithAck<{ player: { id: string }; room: LobbyRoom }, JoinRoomRequest>("resumeSession", {
-        name: latestSession.name,
-        playerId: latestSession.playerId,
-        preferredSeatIndex: latestSession.seatIndex,
-        roomCode: latestSession.roomCode,
-      } satisfies JoinRoomRequest);
+      const response = await emitWithAck<{ player: { id: string }; room: LobbyRoom }, JoinRoomRequest>(
+        MULTIPLAYER_EVENTS.resumeSession,
+        {
+          name: latestSession.name,
+          playerId: latestSession.playerId,
+          preferredSeatIndex: latestSession.seatIndex,
+          roomCode: latestSession.roomCode,
+        } satisfies JoinRoomRequest,
+      );
 
       if (!response.ok || !response.data) {
         clearLobbySession();
         setConnectionState("offline");
-        setErrorMessage(response.error ?? "Unable to restore this room session.");
+        setErrorMessage(toFriendlyLobbyMessage(response.error ?? "Unable to restore this room session."));
         return;
       }
 
@@ -113,8 +134,8 @@ export function useRoomLobby(roomCodeFromRoute: string) {
     socket.on("connect", handleConnect);
     socket.on("connect_error", handleConnectError);
     socket.on("disconnect", handleDisconnect);
-    socket.on("roomUpdated", handleRoomUpdated);
-    socket.on("gameStarted", handleGameStarted);
+    socket.on(MULTIPLAYER_EVENTS.roomUpdated, handleRoomUpdated);
+    socket.on(MULTIPLAYER_EVENTS.roundStarted, handleGameStarted);
 
     if (!socket.connected) {
       socket.connect();
@@ -127,8 +148,8 @@ export function useRoomLobby(roomCodeFromRoute: string) {
       socket.off("connect", handleConnect);
       socket.off("connect_error", handleConnectError);
       socket.off("disconnect", handleDisconnect);
-      socket.off("roomUpdated", handleRoomUpdated);
-      socket.off("gameStarted", handleGameStarted);
+      socket.off(MULTIPLAYER_EVENTS.roomUpdated, handleRoomUpdated);
+      socket.off(MULTIPLAYER_EVENTS.roundStarted, handleGameStarted);
     };
   }, [currentPlayerId, initialSession, normalizedRouteCode, router]);
 
@@ -149,18 +170,32 @@ export function useRoomLobby(roomCodeFromRoute: string) {
     setIsStartingGame(true);
     setErrorMessage("");
 
-    const response = await emitWithAck<GameStartedPayload, StartGameRequest>("startGame", {
+    const response = await emitWithAck<GameStartedPayload, StartGameRequest>(MULTIPLAYER_EVENTS.startGame, {
       playerId: currentPlayerId,
       roomCode: room.code,
     });
 
     if (!response.ok) {
-      setErrorMessage(response.error ?? "The game could not be started.");
-      setIsStartingGame(false);
-      return;
+      setErrorMessage(toFriendlyLobbyMessage(response.error ?? "The game could not be started."));
     }
 
     setIsStartingGame(false);
+  };
+
+  const leaveRoom = async () => {
+    if (!currentPlayerId) {
+      clearLobbySession();
+      router.push("/");
+      return;
+    }
+
+    setIsLeavingRoom(true);
+    await emitWithAck<{ ok: true }, LeaveRoomRequest>(MULTIPLAYER_EVENTS.leaveRoom, {
+      playerId: currentPlayerId,
+      roomCode: normalizedRouteCode,
+    });
+    clearLobbySession();
+    router.push("/");
   };
 
   return {
@@ -169,7 +204,9 @@ export function useRoomLobby(roomCodeFromRoute: string) {
     currentPlayer,
     currentPlayerId,
     errorMessage,
+    isLeavingRoom,
     isStartingGame,
+    leaveRoom,
     room,
     roomCode: normalizedRouteCode,
     startGame,
