@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Big 2 Royale",
-  description: "A polished single-player Big 2 card table against three CPU opponents.",
+  description: "Private Big 2 rooms with a real-time multiplayer lobby and a polished card-table presentation.",
 };
 
 export default function RootLayout({

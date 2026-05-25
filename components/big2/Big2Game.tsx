@@ -96,7 +96,7 @@ export function Big2Game() {
       <main className="relative min-h-screen overflow-hidden px-4 py-4 text-white sm:px-6 lg:px-8">
         <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1600px] items-center justify-center">
           <div className="glass-panel rounded-[2rem] px-8 py-10 text-center">
-            <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Royale</p>
+            <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Online</p>
             <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Shuffling The Deck</h1>
             <p className="mt-3 text-sm text-slate-100/72">Setting up a fresh table for your next hand.</p>
           </div>
@@ -155,7 +155,7 @@ export function Big2Game() {
         <section className="relative flex min-h-[900px] flex-col rounded-[2.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-4 shadow-[0_40px_120px_rgba(0,0,0,0.42)] sm:p-5 lg:p-6">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Royale</p>
+              <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Online</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Single-Player Table</h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/72">
                 Beat the current play, manage the lead, and empty your hand before the CPUs do.

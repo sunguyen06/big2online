@@ -1,5 +1,5 @@
-import { Big2Game } from "@/components/big2/Big2Game";
+import { LobbyHomePage } from "@/components/lobby/LobbyHomePage";
 
 export default function Home() {
-  return <Big2Game />;
+  return <LobbyHomePage />;
 }

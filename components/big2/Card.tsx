@@ -60,8 +60,9 @@ export function Card({
           */}
           <div className="absolute inset-[10%] rounded-[1rem] border border-sky-100/20 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_35%),repeating-linear-gradient(135deg,_rgba(255,255,255,0.08)_0,_rgba(255,255,255,0.08)_6px,_transparent_6px,_transparent_12px),linear-gradient(180deg,rgba(28,98,129,0.9),rgba(10,37,54,0.95))]" />
           <div className="absolute inset-0 grid place-items-center">
-            <div className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.34em] text-sky-50">
-              BIG 2
+            <div className="relative h-12 w-12 rounded-full border border-white/20 bg-white/8">
+              <div className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[0.7rem] border border-sky-100/24 bg-white/6" />
+              <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-100/75" />
             </div>
           </div>
         </>
