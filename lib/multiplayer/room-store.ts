@@ -19,7 +19,7 @@ import {
   RestartGameRequest,
   RecentGameAction,
 } from "@/lib/multiplayer/types";
-import { createRoomCode, normalizeRoomCode, ROOM_CAPACITY, sanitizeDisplayName } from "./utils";
+import { createRoomCode, MIN_ROOM_PLAYERS, normalizeRoomCode, ROOM_CAPACITY, sanitizeDisplayName } from "./utils";
 
 interface ActiveGameState {
   lastAction: RecentGameAction | null;
@@ -206,8 +206,8 @@ export class LobbyRoomStore {
       throw new Error("Only the host can start the game.");
     }
 
-    if (room.players.length !== ROOM_CAPACITY || room.players.some((entry) => !entry.connected)) {
-      throw new Error("You need 4 connected players before starting.");
+    if (!this.canStartRound(room)) {
+      throw new Error("You need at least 3 connected players before starting.");
     }
 
     return this.beginRound(room, playerId);
@@ -229,8 +229,8 @@ export class LobbyRoomStore {
       throw new Error("Finish the current round before dealing another one.");
     }
 
-    if (room.players.length !== ROOM_CAPACITY || room.players.some((entry) => !entry.connected)) {
-      throw new Error("You need 4 connected players before starting.");
+    if (!this.canStartRound(room)) {
+      throw new Error("You need at least 3 connected players before starting.");
     }
 
     return this.beginRound(room, playerId);
@@ -672,6 +672,14 @@ export class LobbyRoomStore {
 
   private sortPlayers(room: RoomState) {
     room.players.sort((a, b) => a.seatIndex - b.seatIndex);
+  }
+
+  private canStartRound(room: RoomState) {
+    return (
+      room.players.length >= MIN_ROOM_PLAYERS &&
+      room.players.length <= ROOM_CAPACITY &&
+      room.players.every((entry) => entry.connected)
+    );
   }
 
   private toPublicGameState(room: RoomState): PublicGameState {

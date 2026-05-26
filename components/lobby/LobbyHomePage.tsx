@@ -270,7 +270,7 @@ export function LobbyHomePage() {
 
         <div className="absolute bottom-4 left-4 hidden max-w-[340px] rounded-[1.3rem] border border-[#d8bc70]/14 bg-[linear-gradient(180deg,rgba(9,22,16,0.76),rgba(5,12,10,0.84))] px-4 py-3 text-left text-sm text-[#e0d6b4] shadow-[0_20px_50px_rgba(0,0,0,0.28)] backdrop-blur md:block">
           <p className="font-semibold uppercase tracking-[0.18em] text-[#f5ebcf]">Private room rules</p>
-          <p className="mt-2 leading-6 text-[#d4ccae]/78">Room codes are required to join. Hosts can still create a fresh private table from here and share the generated code.</p>
+          <p className="mt-2 leading-6 text-[#d4ccae]/78">Room codes are required to join. Private tables can start with 3 or 4 players, and 3-player rooms add 2 jokers so the deal stays even.</p>
         </div>
       </div>
     </main>

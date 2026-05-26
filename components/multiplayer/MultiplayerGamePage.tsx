@@ -12,6 +12,7 @@ import { WinnerModal } from "@/components/big2/WinnerModal";
 import { canPlayMove } from "@/lib/big2/engine";
 import { Seat } from "@/lib/big2/types";
 import { useMultiplayerGame } from "@/lib/multiplayer/useMultiplayerGame";
+import { MIN_ROOM_PLAYERS } from "@/lib/multiplayer/utils";
 import { useUiSoundEffects } from "@/lib/ui/useUiSoundEffects";
 
 const RELATIVE_SEATS: Seat[] = ["south", "west", "north", "east"];
@@ -156,7 +157,8 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
     !!winnerPlayer &&
     !!currentRoomPlayer?.isHost &&
     !!room &&
-    room.players.length === room.maxPlayers &&
+    room.players.length >= MIN_ROOM_PLAYERS &&
+    room.players.length <= room.maxPlayers &&
     room.players.every((player) => player.connected);
 
   const roundEndedMessage = winnerPlayer
@@ -228,7 +230,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
     }
   };
 
-  if (!gameState || !southPlayer || !northPlayer || !westPlayer || !eastPlayer) {
+  if (!gameState || !southPlayer) {
     return (
       <main className="relative min-h-screen overflow-hidden px-4 py-4 text-white sm:px-6 lg:px-8">
         <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1600px] items-center justify-center">
@@ -262,7 +264,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
               <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Online</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Room {roomCode}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/72">
-                Private multiplayer table with server-owned game state, per-player hands, and reconnect-aware room flow.
+                Private multiplayer table with server-owned game state, reconnect-aware room flow, and support for both 3- and 4-player rounds.
               </p>
             </div>
 
@@ -292,20 +294,22 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
 
             <div className="relative mx-auto grid h-full min-h-[760px] w-full max-w-[1200px] grid-cols-2 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_minmax(0,1fr)] md:grid-rows-[auto_minmax(210px,1fr)_auto_auto]">
               <div className="col-span-2 md:col-start-2 md:row-start-1 mx-auto w-full max-w-sm">
-                <PlayerSeat
-                  player={northPlayer}
-                  active={gameState.currentTurnPlayerId === northPlayer.id}
-                  disconnected={!northPlayer.connected}
-                  isLead={gameState.lastPlayedPlayerId === northPlayer.id}
-                  showPass={passFlashPlayerId === northPlayer.id}
-                  statusText={
-                    !northPlayer.connected
-                      ? "Reconnecting"
-                      : gameState.currentTurnPlayerId === northPlayer.id
-                        ? "Reading the center"
-                        : "Tracking the table"
-                  }
-                />
+                {northPlayer ? (
+                  <PlayerSeat
+                    player={northPlayer}
+                    active={gameState.currentTurnPlayerId === northPlayer.id}
+                    disconnected={!northPlayer.connected}
+                    isLead={gameState.lastPlayedPlayerId === northPlayer.id}
+                    showPass={passFlashPlayerId === northPlayer.id}
+                    statusText={
+                      !northPlayer.connected
+                        ? "Reconnecting"
+                        : gameState.currentTurnPlayerId === northPlayer.id
+                          ? "Reading the center"
+                          : "Tracking the table"
+                    }
+                  />
+                ) : null}
               </div>
 
               <div className="col-span-2 md:col-start-2 md:row-start-2 flex items-center justify-center">
@@ -313,37 +317,41 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
               </div>
 
               <div className="col-span-1 md:col-start-1 md:row-start-2 flex items-center">
-                <PlayerSeat
-                  player={westPlayer}
-                  active={gameState.currentTurnPlayerId === westPlayer.id}
-                  disconnected={!westPlayer.connected}
-                  isLead={gameState.lastPlayedPlayerId === westPlayer.id}
-                  showPass={passFlashPlayerId === westPlayer.id}
-                  statusText={
-                    !westPlayer.connected
-                      ? "Reconnecting"
-                      : gameState.currentTurnPlayerId === westPlayer.id
-                        ? "On the clock"
-                        : "Holding the line"
-                  }
-                />
+                {westPlayer ? (
+                  <PlayerSeat
+                    player={westPlayer}
+                    active={gameState.currentTurnPlayerId === westPlayer.id}
+                    disconnected={!westPlayer.connected}
+                    isLead={gameState.lastPlayedPlayerId === westPlayer.id}
+                    showPass={passFlashPlayerId === westPlayer.id}
+                    statusText={
+                      !westPlayer.connected
+                        ? "Reconnecting"
+                        : gameState.currentTurnPlayerId === westPlayer.id
+                          ? "On the clock"
+                          : "Holding the line"
+                    }
+                  />
+                ) : null}
               </div>
 
               <div className="col-span-1 md:col-start-3 md:row-start-2 flex items-center justify-end">
-                <PlayerSeat
-                  player={eastPlayer}
-                  active={gameState.currentTurnPlayerId === eastPlayer.id}
-                  disconnected={!eastPlayer.connected}
-                  isLead={gameState.lastPlayedPlayerId === eastPlayer.id}
-                  showPass={passFlashPlayerId === eastPlayer.id}
-                  statusText={
-                    !eastPlayer.connected
-                      ? "Reconnecting"
-                      : gameState.currentTurnPlayerId === eastPlayer.id
-                        ? "Under pressure"
-                        : "Watching for an opening"
-                  }
-                />
+                {eastPlayer ? (
+                  <PlayerSeat
+                    player={eastPlayer}
+                    active={gameState.currentTurnPlayerId === eastPlayer.id}
+                    disconnected={!eastPlayer.connected}
+                    isLead={gameState.lastPlayedPlayerId === eastPlayer.id}
+                    showPass={passFlashPlayerId === eastPlayer.id}
+                    statusText={
+                      !eastPlayer.connected
+                        ? "Reconnecting"
+                        : gameState.currentTurnPlayerId === eastPlayer.id
+                          ? "Under pressure"
+                          : "Watching for an opening"
+                    }
+                  />
+                ) : null}
               </div>
 
               <div className="col-span-2 md:col-span-3 md:row-start-3">
@@ -445,6 +453,9 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
             <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-100/74">
               <p>
                 Connection: <span className="font-semibold capitalize text-white">{connectionState}</span>
+              </p>
+              <p>
+                Format: <span className="font-semibold text-white">{room?.players.length === 3 ? "3-player joker deck" : "4-player standard deck"}</span>
               </p>
               <p>
                 Seat: <span className="font-semibold text-white">{southPlayer.name}</span>

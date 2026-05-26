@@ -7,6 +7,8 @@ import {
   canPlayMove,
   compareMoves,
   createDeck,
+  createGameStateForPlayers,
+  dealCards,
   getCardValue,
   identifyMove,
   isValidMove,
@@ -126,6 +128,61 @@ function run(): void {
 
   assert.equal(firstTurnInvalid.valid, false, "The first move must include 3 of Diamonds.");
   assert.equal(firstTurnValid.valid, true, "Playing 3 of Diamonds should be a legal opening move.");
+
+  const threePlayerDeck = createDeck({ includeJokers: true });
+  const threePlayerHands = dealCards(threePlayerDeck, 3);
+  const jokers = threePlayerDeck.filter((card) => card.isJoker);
+
+  assert.equal(threePlayerDeck.length, 54, "Three-player rounds should use a 54-card deck.");
+  assert.equal(threePlayerHands.length, 3, "Three-player dealing should produce 3 hands.");
+  assert.ok(threePlayerHands.every((hand) => hand.length === 18), "Three-player rounds should deal 18 cards each.");
+  assert.equal(jokers.length, 2, "The three-player deck should include exactly two jokers.");
+  assert.equal(canPlayMove([jokers[0]], null, true, false).valid, true, "A joker should be playable as a single.");
+  assert.ok(getCardValue(jokers[1]) > getCardValue(jokers[0]), "The red joker should rank above the black joker.");
+  assert.ok(getCardValue(jokers[0]) > getCardValue(twoOfSpades), "The black joker should rank above every 2.");
+  assert.equal(
+    isValidMove([jokers[0], getCard("3", "Diamonds"), getCard("4", "Diamonds"), getCard("5", "Diamonds"), getCard("6", "Diamonds")]),
+    false,
+    "Jokers should not participate in five-card hands in this build.",
+  );
+  assert.equal(
+    canPlayMove(jokers, identifyMove([getCard("9", "Diamonds")]), false, false).valid,
+    true,
+    "Double jokers should beat a single.",
+  );
+  assert.equal(
+    canPlayMove(jokers, identifyMove([getCard("10", "Diamonds"), getCard("10", "Clubs"), getCard("10", "Hearts")]), false, false).valid,
+    true,
+    "Double jokers should beat a triple.",
+  );
+  assert.equal(
+    canPlayMove(
+      jokers,
+      identifyMove([
+        getCard("8", "Spades"),
+        getCard("9", "Spades"),
+        getCard("10", "Spades"),
+        getCard("J", "Spades"),
+        getCard("Q", "Spades"),
+      ]),
+      false,
+      false,
+    ).valid,
+    true,
+    "Double jokers should beat a five-card hand.",
+  );
+
+  const threePlayerState = createGameStateForPlayers(
+    [
+      { id: 0, name: "P1", kind: "human", seat: "south" },
+      { id: 1, name: "P2", kind: "human", seat: "west" },
+      { id: 2, name: "P3", kind: "human", seat: "north" },
+    ],
+    () => 0.5,
+  );
+
+  assert.equal(threePlayerState.players.length, 3, "Three-player state creation should preserve the requested table size.");
+  assert.ok(threePlayerState.players.every((player) => player.hand.length === 18), "Three-player state should deal 18 cards per player.");
 
   const initialState = buildState([
     buildPlayer(0, [threeOfDiamonds, getCard("5", "Clubs")]),

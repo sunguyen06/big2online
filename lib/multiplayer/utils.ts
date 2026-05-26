@@ -1,3 +1,4 @@
+export const MIN_ROOM_PLAYERS = 3;
 export const ROOM_CAPACITY = 4;
 export const ROOM_CODE_LENGTH = 5;
 const ROOM_CODE_PATTERN = /^[A-Z0-9]{5,6}$/;

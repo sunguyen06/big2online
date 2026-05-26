@@ -39,8 +39,8 @@ export function toFriendlyGameMessage(message: string) {
       return "Select one or more cards before playing.";
     case "The first move of the round must include 3 of Diamonds.":
       return "The opening play must include the 3 of Diamonds.";
-    case "You need 4 connected players before starting.":
-      return "All four seats need to be connected before dealing a new round.";
+    case "You need at least 3 connected players before starting.":
+      return "You need 3 or 4 connected players before dealing a round.";
     case "Finish the current round before dealing another one.":
       return "Wait for the current round to finish before starting a new one.";
     default:

@@ -36,8 +36,11 @@ export function Card({
   className = "",
   animationKey,
 }: CardProps) {
-  const isRed = card?.suit === 0 || card?.suit === 2;
+  const isJoker = !!card?.isJoker;
+  const isRed = isJoker ? card?.jokerColor === "red" : card?.suit === 0 || card?.suit === 2;
   const label = card ? getCardLabel(card) : "";
+  const cornerRank = isJoker ? (card?.jokerColor === "red" ? "RJ" : "BJ") : label.slice(0, -1);
+  const cornerSuit = isJoker ? "★" : label.slice(-1);
 
   const frame = (
     <div
@@ -81,17 +84,24 @@ export function Card({
           ) : null}
 
           <div className={`absolute left-3 top-2 flex flex-col leading-none ${isRed ? "text-rose-600" : "text-slate-900"}`}>
-            <span className="text-lg font-bold">{label.slice(0, -1)}</span>
-            <span className="text-lg">{label.slice(-1)}</span>
+            <span className="text-lg font-bold">{cornerRank}</span>
+            <span className="text-lg">{cornerSuit}</span>
           </div>
 
-          <div className={`absolute inset-0 grid place-items-center text-[2.8rem] sm:text-[3.4rem] ${isRed ? "text-rose-500" : "text-slate-800"}`}>
-            <span>{label.slice(-1)}</span>
+          <div className={`absolute inset-0 grid place-items-center ${isRed ? "text-rose-500" : "text-slate-800"}`}>
+            {isJoker ? (
+              <div className="text-center">
+                <div className="text-[0.75rem] font-semibold uppercase tracking-[0.28em]">Joker</div>
+                <div className="mt-1 text-[2.1rem] sm:text-[2.6rem]">★</div>
+              </div>
+            ) : (
+              <span className="text-[2.8rem] sm:text-[3.4rem]">{label.slice(-1)}</span>
+            )}
           </div>
 
           <div className={`absolute bottom-2 right-3 flex rotate-180 flex-col leading-none ${isRed ? "text-rose-600" : "text-slate-900"}`}>
-            <span className="text-lg font-bold">{label.slice(0, -1)}</span>
-            <span className="text-lg">{label.slice(-1)}</span>
+            <span className="text-lg font-bold">{cornerRank}</span>
+            <span className="text-lg">{cornerSuit}</span>
           </div>
         </>
       )}

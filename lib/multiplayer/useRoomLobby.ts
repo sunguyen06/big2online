@@ -20,7 +20,7 @@ import {
   LobbyRoom,
   StartGameRequest,
 } from "./types";
-import { normalizeRoomCode } from "./utils";
+import { MIN_ROOM_PLAYERS, normalizeRoomCode } from "./utils";
 
 type ConnectionState = "connected" | "connecting" | "offline" | "reconnecting";
 
@@ -157,7 +157,8 @@ export function useRoomLobby(roomCodeFromRoute: string) {
   const canStartGame =
     !!currentPlayer?.isHost &&
     !!room &&
-    room.players.length === room.maxPlayers &&
+    room.players.length >= MIN_ROOM_PLAYERS &&
+    room.players.length <= room.maxPlayers &&
     room.players.every((player) => player.connected) &&
     room.status === "lobby";
 

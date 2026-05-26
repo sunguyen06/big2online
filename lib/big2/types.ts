@@ -3,6 +3,11 @@ export const RANKS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export type Suit = (typeof SUITS)[number];
 export type Rank = (typeof RANKS)[number];
+export type JokerColor = "black" | "red";
+export type JokerRank = 13;
+export type JokerSuit = 4 | 5;
+export type CardRank = Rank | JokerRank;
+export type CardSuit = Suit | JokerSuit;
 export type Seat = "south" | "west" | "north" | "east";
 export type PlayerKind = "human" | "cpu";
 
@@ -21,8 +26,10 @@ export type GameStatus = "dealing" | "playing" | "ended";
 
 export interface Card {
   id: string;
-  rank: Rank;
-  suit: Suit;
+  rank: CardRank;
+  suit: CardSuit;
+  isJoker?: boolean;
+  jokerColor?: JokerColor;
 }
 
 export interface Move {
@@ -30,10 +37,11 @@ export interface Move {
   type: MoveType;
   handType: MoveType;
   cardCount: 1 | 2 | 3 | 5;
+  isBomb?: boolean;
   categoryRank: number;
-  primaryRank: Rank;
-  secondaryRank?: Rank;
-  topSuit: Suit;
+  primaryRank: CardRank;
+  secondaryRank?: CardRank;
+  topSuit: CardSuit;
   strength: number[];
   summary: string;
 }

@@ -1,6 +1,6 @@
 # Big 2 Royale
 
-Big 2 Royale is a polished private-room Big 2 prototype built for four real players in separate browser windows. It focuses on a premium felt-table presentation, real-time room flow, and a clean split between multiplayer state management and UI.
+Big 2 Royale is a polished private-room Big 2 prototype built for real players in separate browser windows. It focuses on a premium felt-table presentation, real-time room flow, and a clean split between multiplayer state management and UI.
 
 ## Tech Stack
 
@@ -54,12 +54,12 @@ npm run test:big2
 
 ## Multiplayer Notes
 
-- Rooms support exactly 4 seats
-- The host can only start a round when all 4 seats are filled and connected
+- Rooms support up to 4 seats and can start with 3 or 4 connected players
+- Three-player rooms add 2 jokers so the 54-card deck deals evenly at 18 cards each
 - Each browser only receives its own private hand
 - Refreshing a tab attempts to restore the same saved seat
 - If a player disconnects during a round, their seat is marked disconnected and the table shows reconnect guidance
-- Hosts can deal a new round after a hand ends, as long as all 4 players are connected again
+- Hosts can deal a new round after a hand ends, as long as 3 or 4 seated players are connected again
 
 ## Current Limitations
 
@@ -86,3 +86,5 @@ Search for comments mentioning `Placeholder` to find the intended swap points fo
 - Five-card ranking is `Straight < Flush < Full House < Four of a Kind < Straight Flush`
 - The opening move must include the 3 of Diamonds
 - Passing is not allowed while starting a fresh trick
+- In 3-player private rooms, jokers are added with `Red Joker > Black Joker > all 2s`
+- The two jokers together can be played at any time to beat any active move

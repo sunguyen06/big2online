@@ -7,6 +7,8 @@ import {
 } from "@/lib/big2/constants";
 import {
   Card,
+  CardRank,
+  CardSuit,
   EvaluatedMove,
   GameState,
   GameStatus,
@@ -19,12 +21,17 @@ import {
   ValidationResult,
 } from "@/lib/big2/types";
 
-const PLAYER_COUNT = 4;
-const CARDS_PER_PLAYER = 13;
+const MIN_PLAYER_COUNT = 3;
+const MAX_PLAYER_COUNT = 4;
+const JOKER_RANK = 13;
+const BLACK_JOKER_SUIT = 4;
+const RED_JOKER_SUIT = 5;
+const BLACK_JOKER_ID = "joker-black";
+const RED_JOKER_ID = "joker-red";
 const THREE_OF_DIAMONDS_ID = "0-0";
 const DEFAULT_SEAT_ORDER: Player["seat"][] = ["south", "west", "north", "east"];
 
-export function createDeck(): Card[] {
+export function createDeck({ includeJokers = false }: { includeJokers?: boolean } = {}): Card[] {
   const deck: Card[] = [];
 
   for (let rank = 0; rank < RANK_LABELS.length; rank += 1) {
@@ -35,6 +42,23 @@ export function createDeck(): Card[] {
         suit: suit as Suit,
       });
     }
+  }
+
+  if (includeJokers) {
+    deck.push({
+      id: BLACK_JOKER_ID,
+      isJoker: true,
+      jokerColor: "black",
+      rank: JOKER_RANK,
+      suit: BLACK_JOKER_SUIT,
+    });
+    deck.push({
+      id: RED_JOKER_ID,
+      isJoker: true,
+      jokerColor: "red",
+      rank: JOKER_RANK,
+      suit: RED_JOKER_SUIT,
+    });
   }
 
   return deck;
@@ -51,13 +75,19 @@ export function shuffleDeck(deck: Card[], random: () => number = Math.random): C
   return copy;
 }
 
-export function dealCards(deck: Card[]): Card[][] {
-  if (deck.length !== PLAYER_COUNT * CARDS_PER_PLAYER) {
-    throw new Error(`Expected a ${PLAYER_COUNT * CARDS_PER_PLAYER}-card deck, received ${deck.length}.`);
+export function dealCards(deck: Card[], playerCount: number): Card[][] {
+  if (playerCount < MIN_PLAYER_COUNT || playerCount > MAX_PLAYER_COUNT) {
+    throw new Error(`Expected ${MIN_PLAYER_COUNT} or ${MAX_PLAYER_COUNT} players, received ${playerCount}.`);
   }
 
-  return Array.from({ length: PLAYER_COUNT }, (_, playerIndex) =>
-    deck.slice(playerIndex * CARDS_PER_PLAYER, (playerIndex + 1) * CARDS_PER_PLAYER),
+  if (deck.length % playerCount !== 0) {
+    throw new Error(`Expected a deck divisible across ${playerCount} players, received ${deck.length} cards.`);
+  }
+
+  const cardsPerPlayer = deck.length / playerCount;
+
+  return Array.from({ length: playerCount }, (_, playerIndex) =>
+    deck.slice(playerIndex * cardsPerPlayer, (playerIndex + 1) * cardsPerPlayer),
   );
 }
 
@@ -66,10 +96,14 @@ export function sortCards(cards: Card[]): Card[] {
 }
 
 export function getCardValue(card: Card): number {
+  if (card.isJoker) {
+    return 52 + (card.jokerColor === "red" ? 1 : 0);
+  }
+
   return card.rank * SUIT_SYMBOLS.length + getSuitValue(card.suit);
 }
 
-export function getSuitValue(suit: Suit): number {
+export function getSuitValue(suit: CardSuit): number {
   return suit;
 }
 
@@ -116,6 +150,10 @@ export function identifyMove(cards: Card[]): Move | null {
     return null;
   }
 
+  if (sorted.some((card) => card.isJoker)) {
+    return null;
+  }
+
   const straightHighCard = getStraightHighCard(sorted);
   const isFlush = sorted.every((card) => card.suit === sorted[0].suit);
   const groups = groupCardsByRank(sorted);
@@ -136,7 +174,7 @@ export function identifyMove(cards: Card[]): Move | null {
       undefined,
       straightHighCard.suit,
       buildStraightStrength(FIVE_CARD_STRENGTH["straight-flush"], straightHighCard),
-      `a straight flush, ${RANK_LABELS[straightHighCard.rank]} high`,
+      `a straight flush, ${getStandardRankLabel(straightHighCard.rank)} high`,
     );
   }
 
@@ -194,7 +232,7 @@ export function identifyMove(cards: Card[]): Move | null {
       undefined,
       straightHighCard.suit,
       buildStraightStrength(FIVE_CARD_STRENGTH.straight, straightHighCard),
-      `a straight, ${RANK_LABELS[straightHighCard.rank]} high`,
+      `a straight, ${getStandardRankLabel(straightHighCard.rank)} high`,
     );
   }
 
@@ -206,6 +244,14 @@ export function isValidMove(cards: Card[]): boolean {
 }
 
 export function compareMoves(moveA: Move, moveB: Move): number {
+  if (moveA.isBomb || moveB.isBomb) {
+    if (moveA.isBomb && moveB.isBomb) {
+      return compareStrength(moveA.strength, moveB.strength);
+    }
+
+    return moveA.isBomb ? 1 : -1;
+  }
+
   if (moveA.cardCount !== moveB.cardCount) {
     return moveA.cardCount - moveB.cardCount;
   }
@@ -239,6 +285,14 @@ export function canPlayMove(
 
   if (isStartingTrick || !currentMove) {
     return { valid: true, message: `Play ${move.summary}.`, move };
+  }
+
+  if (move.isBomb) {
+    return { valid: true, message: `${move.summary} beats the current move.`, move };
+  }
+
+  if (currentMove.isBomb) {
+    return { valid: false, message: "Selected cards do not beat the current move.", move };
   }
 
   if (move.cardCount !== currentMove.cardCount) {
@@ -393,12 +447,13 @@ export function createGameStateForPlayers(
   }>,
   random: () => number = Math.random,
 ): GameState {
-  if (playersInput.length !== PLAYER_COUNT) {
-    throw new Error(`Expected ${PLAYER_COUNT} players, received ${playersInput.length}.`);
+  if (playersInput.length < MIN_PLAYER_COUNT || playersInput.length > MAX_PLAYER_COUNT) {
+    throw new Error(`Expected ${MIN_PLAYER_COUNT} or ${MAX_PLAYER_COUNT} players, received ${playersInput.length}.`);
   }
 
-  const deck = shuffleDeck(createDeck(), random);
-  const hands = dealCards(deck).map((hand) => sortCards(hand));
+  const includeJokers = playersInput.length === MIN_PLAYER_COUNT;
+  const deck = shuffleDeck(createDeck({ includeJokers }), random);
+  const hands = dealCards(deck, playersInput.length).map((hand) => sortCards(hand));
   const players: Player[] = playersInput.map((player, index) => ({
     id: player.id,
     hand: hands[index],
@@ -414,6 +469,9 @@ export function createGameStateForPlayers(
     winner: null,
     log: [
       makeLog(`${players[starter].name} holds 3 of Diamonds and starts the round.`, "system"),
+      ...(includeJokers
+        ? [makeLog("Three-player house rule: two jokers are added to the deck. Jokers can only be played as singles or as a pair.", "system")]
+        : []),
       makeLog("House rule: straights run from 3-4-5-6-7 up to 10-J-Q-K-A. 2 cannot be used in a straight.", "system"),
     ],
     turnCount: 0,
@@ -497,14 +555,30 @@ export function getPlayableCardIds(state: GameState, playerIndex: number, select
 }
 
 export function getCardLabel(card: Card): string {
-  return `${RANK_LABELS[card.rank]}${SUIT_SYMBOLS[card.suit]}`;
+  if (card.isJoker) {
+    return card.jokerColor === "red" ? "Red Joker" : "Black Joker";
+  }
+
+  return `${getStandardRankLabel(card.rank)}${getStandardSuitSymbol(card.suit)}`;
 }
 
-export function getSuitName(suit: Suit): string {
-  return SUIT_LABELS[suit];
+export function getSuitName(suit: CardSuit): string {
+  if (suit === BLACK_JOKER_SUIT) {
+    return "Black Joker";
+  }
+
+  if (suit === RED_JOKER_SUIT) {
+    return "Red Joker";
+  }
+
+  return SUIT_LABELS[suit as Suit];
 }
 
-export function getRankName(rank: Rank, plural = false): string {
+export function getRankName(rank: CardRank, plural = false): string {
+  if (rank === JOKER_RANK) {
+    return plural ? "Jokers" : "Joker";
+  }
+
   const singular = [
     "Three",
     "Four",
@@ -542,9 +616,9 @@ function createMove(
   cards: Card[],
   type: Move["type"],
   categoryRank: number,
-  primaryRank: Rank,
-  secondaryRank: Rank | undefined,
-  topSuit: Suit,
+  primaryRank: CardRank,
+  secondaryRank: CardRank | undefined,
+  topSuit: CardSuit,
   strength: number[],
   summary: string,
 ): Move {
@@ -553,6 +627,7 @@ function createMove(
     type,
     handType: type,
     cardCount: cards.length as Move["cardCount"],
+    isBomb: isDoubleJokerMove(cards),
     categoryRank,
     primaryRank,
     secondaryRank,
@@ -615,13 +690,13 @@ function getStraightHighCard(cards: Card[]): Card | null {
   return sorted[4];
 }
 
-function groupCardsByRank(cards: Card[]): Map<Rank, Card[]> {
+function groupCardsByRank(cards: Card[]): Map<CardRank, Card[]> {
   return cards.reduce((groups, card) => {
     const existing = groups.get(card.rank) ?? [];
     existing.push(card);
     groups.set(card.rank, existing);
     return groups;
-  }, new Map<Rank, Card[]>());
+  }, new Map<CardRank, Card[]>());
 }
 
 function compareStrength(left: number[], right: number[]): number {
@@ -634,6 +709,10 @@ function compareStrength(left: number[], right: number[]): number {
   }
 
   return 0;
+}
+
+function isDoubleJokerMove(cards: Card[]): boolean {
+  return cards.length === 2 && cards.every((card) => card.isJoker);
 }
 
 function containsThreeOfDiamonds(cards: Card[]): boolean {
@@ -705,4 +784,12 @@ function syncLegacyFields(state: GameState): GameState {
     firstTurn: state.turn.isFirstTurn,
     phase: state.status,
   };
+}
+
+function getStandardRankLabel(rank: CardRank) {
+  return RANK_LABELS[rank as Rank];
+}
+
+function getStandardSuitSymbol(suit: CardSuit) {
+  return SUIT_SYMBOLS[suit as Suit];
 }

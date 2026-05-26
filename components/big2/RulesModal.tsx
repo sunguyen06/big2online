@@ -84,6 +84,13 @@ export function RulesModal({ open, onClose }: RulesModalProps) {
             </section>
 
             <section className="mt-4 rounded-[1.5rem] border border-white/8 bg-black/16 p-4">
+              <p className="panel-label">Three-Player House Rule</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-100/78">
+                Private rooms can start with 3 or 4 players. When a room starts with exactly 3 players, two jokers are added so everyone receives 18 cards. Red Joker beats Black Joker, Black Joker beats every 2, and the two jokers together can be played at any time to beat any active move.
+              </p>
+            </section>
+
+            <section className="mt-4 rounded-[1.5rem] border border-white/8 bg-black/16 p-4">
               <p className="panel-label">Straight Assumption</p>
               <p className="mt-3 text-sm leading-relaxed text-slate-100/78">
                 This prototype uses straights from 3-4-5-6-7 up to 10-J-Q-K-A only. 2 is not used inside a straight in this build.

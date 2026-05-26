@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { RulesModal } from "@/components/big2/RulesModal";
 import { LobbySeatCard } from "@/components/lobby/LobbySeatCard";
 import { useRoomLobby } from "@/lib/multiplayer/useRoomLobby";
+import { MIN_ROOM_PLAYERS } from "@/lib/multiplayer/utils";
 import { useUiSoundEffects } from "@/lib/ui/useUiSoundEffects";
 
 export function RoomLobbyPage({ roomCode }: { roomCode: string }) {
@@ -62,7 +63,7 @@ export function RoomLobbyPage({ roomCode }: { roomCode: string }) {
               <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/66">Private Room</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Lobby {roomCode}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/72">
-                Fill every seat, let the host deal, and move the whole table into the round together.
+                Start once 3 connected players are ready, or keep the fourth seat open until someone else joins.
               </p>
             </div>
 
@@ -153,7 +154,7 @@ export function RoomLobbyPage({ roomCode }: { roomCode: string }) {
               {currentPlayer?.isHost ? "You are the host." : "Waiting for the host."}
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-100/70">
-              Only the host can start the round, and only after all 4 connected seats are filled.
+              Only the host can start the round, and any table with 3 or 4 connected players is eligible.
             </p>
 
             {currentPlayer?.isHost ? (
@@ -167,14 +168,16 @@ export function RoomLobbyPage({ roomCode }: { roomCode: string }) {
               </button>
             ) : (
               <div className="mt-5 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-slate-100/70">
-                The host will start the game when the lobby reaches 4 players.
+                The host can start once the lobby reaches 3 players, or wait for a 4th.
               </div>
             )}
 
             <div className="mt-4 text-xs text-slate-100/58">
-              {room?.players.length === 4
+              {room?.players.length === room?.maxPlayers
                 ? "All seats are filled."
-                : `Need ${Math.max(0, 4 - (room?.players.length ?? 0))} more player${room && 4 - room.players.length === 1 ? "" : "s"}.`}
+                : (room?.players.length ?? 0) >= MIN_ROOM_PLAYERS
+                  ? "Ready to start now, or wait for one more player."
+                  : `Need ${Math.max(0, MIN_ROOM_PLAYERS - (room?.players.length ?? 0))} more player${room && MIN_ROOM_PLAYERS - room.players.length === 1 ? "" : "s"} to start.`}
             </div>
           </div>
 
