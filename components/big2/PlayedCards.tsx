@@ -21,7 +21,7 @@ export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsPro
   const origin = originBySeat[seat];
 
   return (
-    <div className="glass-panel min-h-[220px] rounded-[2rem] border-white/10 p-5 sm:p-6">
+    <div className="glass-panel min-h-[200px] rounded-[2rem] border-white/10 p-4 sm:p-5 lg:min-h-[220px]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="panel-label">Current Trick</p>
@@ -32,7 +32,7 @@ export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsPro
         </div>
       </div>
 
-      <div className="grid min-h-[132px] place-items-center rounded-[1.6rem] border border-white/6 bg-black/10 px-3 py-4">
+      <div className="grid min-h-[110px] place-items-center rounded-[1.6rem] border border-white/6 bg-black/10 px-3 py-3">
         <AnimatePresence mode="wait">
           {move ? (
             <motion.div

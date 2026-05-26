@@ -11,7 +11,7 @@ interface CardProps {
   playable?: boolean;
   interactive?: boolean;
   onClick?: () => void;
-  size?: "sm" | "md";
+  size?: "sm" | "compact" | "md";
   delay?: number;
   initialOffset?: { x?: number; y?: number; rotate?: number };
   className?: string;
@@ -20,6 +20,7 @@ interface CardProps {
 
 const sizeClasses = {
   sm: "h-24 w-[68px] sm:h-28 sm:w-[78px]",
+  compact: "h-[6.8rem] w-[76px] sm:h-[7.4rem] sm:w-[82px] lg:h-32 lg:w-[88px]",
   md: "h-32 w-[92px] sm:h-36 sm:w-[100px] lg:h-40 lg:w-[112px]",
 };
 

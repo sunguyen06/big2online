@@ -16,6 +16,7 @@ import { MIN_ROOM_PLAYERS } from "@/lib/multiplayer/utils";
 import { useUiSoundEffects } from "@/lib/ui/useUiSoundEffects";
 
 const RELATIVE_SEATS: Seat[] = ["south", "west", "north", "east"];
+const RELATIVE_SEATS_THREE_PLAYER: Seat[] = ["south", "west", "east"];
 
 interface TablePlayerView {
   cardCount: number;
@@ -85,11 +86,16 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
       return [];
     }
 
-    const mySeatIndex = gameState.players.find((player) => player.id === currentPlayerId)?.seatIndex ?? 0;
+    const myPlayerIndex = gameState.players.findIndex((player) => player.id === currentPlayerId);
+    const mySeatIndex = gameState.players[myPlayerIndex]?.seatIndex ?? 0;
+    const relativeSeats = gameState.players.length === 3 ? RELATIVE_SEATS_THREE_PLAYER : RELATIVE_SEATS;
 
-    return gameState.players.map((player) => ({
+    return gameState.players.map((player, playerIndex) => ({
       ...player,
-      seat: RELATIVE_SEATS[(player.seatIndex - mySeatIndex + 4) % 4] ?? "south",
+      seat:
+        gameState.players.length === 3
+          ? relativeSeats[(playerIndex - myPlayerIndex + 3) % 3] ?? "south"
+          : relativeSeats[(player.seatIndex - mySeatIndex + 4) % 4] ?? "south",
     }));
   }, [currentPlayerId, gameState]);
 
@@ -160,6 +166,14 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
     room.players.length >= MIN_ROOM_PLAYERS &&
     room.players.length <= room.maxPlayers &&
     room.players.every((player) => player.connected);
+  const isThreePlayerTable = gameState?.players.length === 3;
+  const tableGridClass = isThreePlayerTable
+    ? "grid-cols-1 gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(380px,560px)_minmax(220px,1fr)] lg:grid-rows-[minmax(250px,1fr)_auto_auto]"
+    : "grid-cols-1 gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(380px,560px)_minmax(220px,1fr)] lg:grid-rows-[auto_minmax(220px,1fr)_auto_auto]";
+  const currentSeatLabel =
+    typeof currentRoomPlayer?.seatIndex === "number"
+      ? `${["South", "West", "North", "East"][currentRoomPlayer.seatIndex] ?? `Seat ${currentRoomPlayer.seatIndex + 1}`} seat`
+      : "Restoring seat";
 
   const roundEndedMessage = winnerPlayer
     ? canRestartRound
@@ -254,16 +268,16 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden px-4 py-4 text-white sm:px-6 lg:px-8">
+    <main className="relative min-h-screen overflow-hidden px-3 py-3 text-white sm:px-4 lg:h-screen lg:px-4 lg:py-2">
       <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
 
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1920px] flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_360px] 2xl:relative 2xl:block 2xl:pr-4">
-        <section className="table-shell relative flex min-h-[900px] flex-col rounded-[2.4rem] p-4 sm:p-5 lg:p-6 2xl:mx-auto 2xl:max-w-[1184px]">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+      <div className="mx-auto flex w-full max-w-[1880px] flex-col gap-3 lg:h-[calc(100vh-1rem)] xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:items-stretch">
+        <section className="table-shell relative flex flex-col rounded-[2.2rem] p-4 sm:p-5 lg:h-full lg:min-h-0 lg:p-5">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/62">Big 2 Online</p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Room {roomCode}</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/72">
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-white sm:text-[2.4rem] lg:text-[2.55rem]">Room {roomCode}</h1>
+              <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-100/72">
                 Private multiplayer table with server-owned game state, reconnect-aware room flow, and support for both 3- and 4-player rounds.
               </p>
             </div>
@@ -286,37 +300,51 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
             </div>
           </div>
 
-          <div className="felt-surface table-rim relative flex-1 overflow-hidden rounded-[2.2rem] border border-emerald-100/10 px-3 py-5 sm:px-5 lg:px-7">
+          <div className="felt-surface table-rim relative flex-1 overflow-hidden rounded-[2rem] border border-emerald-100/10 px-3 py-4 sm:px-4 lg:min-h-0 lg:px-6 lg:py-4 xl:px-7">
             <div className="absolute inset-[4%] rounded-[50%] border border-emerald-100/10" />
             <div className="absolute inset-[8%] rounded-[50%] border border-white/6" />
             <div className="pointer-events-none absolute inset-x-[12%] top-6 h-24 rounded-full bg-white/5 blur-3xl" />
             <div className="pointer-events-none absolute inset-x-[20%] bottom-20 h-24 rounded-full bg-emerald-300/6 blur-3xl" />
 
-            <div className="relative mx-auto grid h-full min-h-[760px] w-full max-w-[1200px] grid-cols-2 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_minmax(0,1fr)] md:grid-rows-[auto_minmax(210px,1fr)_auto_auto]">
-              <div className="col-span-2 md:col-start-2 md:row-start-1 mx-auto w-full max-w-sm">
-                {northPlayer ? (
-                  <PlayerSeat
-                    player={northPlayer}
-                    active={gameState.currentTurnPlayerId === northPlayer.id}
-                    disconnected={!northPlayer.connected}
-                    isLead={gameState.lastPlayedPlayerId === northPlayer.id}
-                    showPass={passFlashPlayerId === northPlayer.id}
-                    statusText={
-                      !northPlayer.connected
-                        ? "Reconnecting"
-                        : gameState.currentTurnPlayerId === northPlayer.id
-                          ? "Reading the center"
-                          : "Tracking the table"
-                    }
-                  />
-                ) : null}
+            <div className={`relative mx-auto grid h-full min-h-[620px] w-full max-w-[1380px] lg:min-h-0 ${tableGridClass}`}>
+              {!isThreePlayerTable ? (
+                <div className="mx-auto w-full max-w-[320px] lg:col-start-2 lg:row-start-1">
+                  {northPlayer ? (
+                    <PlayerSeat
+                      player={northPlayer}
+                      active={gameState.currentTurnPlayerId === northPlayer.id}
+                      disconnected={!northPlayer.connected}
+                      isLead={gameState.lastPlayedPlayerId === northPlayer.id}
+                      showPass={passFlashPlayerId === northPlayer.id}
+                      statusText={
+                        !northPlayer.connected
+                          ? "Reconnecting"
+                          : gameState.currentTurnPlayerId === northPlayer.id
+                            ? "Reading the center"
+                            : "Tracking the table"
+                      }
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div
+                className={[
+                  "flex items-center justify-center self-center",
+                  isThreePlayerTable ? "lg:col-start-2 lg:row-start-1" : "lg:col-start-2 lg:row-start-2",
+                ].join(" ")}
+              >
+                <div className="w-full max-w-[560px]">
+                  <PlayedCards move={gameState.currentMove} playerName={lastPlayedPlayer?.name} seat={lastPlayedPlayer?.seat} />
+                </div>
               </div>
 
-              <div className="col-span-2 md:col-start-2 md:row-start-2 flex items-center justify-center">
-                <PlayedCards move={gameState.currentMove} playerName={lastPlayedPlayer?.name} seat={lastPlayedPlayer?.seat} />
-              </div>
-
-              <div className="col-span-1 md:col-start-1 md:row-start-2 flex items-center">
+              <div
+                className={[
+                  "flex items-center justify-center",
+                  isThreePlayerTable ? "lg:col-start-1 lg:row-start-1" : "lg:col-start-1 lg:row-start-2",
+                ].join(" ")}
+              >
                 {westPlayer ? (
                   <PlayerSeat
                     player={westPlayer}
@@ -335,7 +363,12 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                 ) : null}
               </div>
 
-              <div className="col-span-1 md:col-start-3 md:row-start-2 flex items-center justify-end">
+              <div
+                className={[
+                  "flex items-center justify-center",
+                  isThreePlayerTable ? "lg:col-start-3 lg:row-start-1" : "lg:col-start-3 lg:row-start-2",
+                ].join(" ")}
+              >
                 {eastPlayer ? (
                   <PlayerSeat
                     player={eastPlayer}
@@ -354,8 +387,8 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                 ) : null}
               </div>
 
-              <div className="col-span-2 md:col-span-3 md:row-start-3">
-                <div className="glass-panel rounded-[1.75rem] p-4 sm:p-5">
+              <div className="lg:col-span-3 lg:row-start-3">
+                <div className="glass-panel rounded-[1.75rem] p-3 sm:p-3.5">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <p className="panel-label">Action</p>
@@ -391,9 +424,9 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                 </div>
               </div>
 
-              <div className="col-span-2 md:col-span-3 md:row-start-4">
+              <div className="lg:col-span-3 lg:row-start-4">
                 <motion.div
-                  className="glass-panel rounded-[1.8rem] px-3 pb-2 pt-4 sm:px-5"
+                  className="glass-panel rounded-[1.8rem] px-3 pb-1 pt-2.5 sm:px-4"
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
@@ -401,7 +434,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                     <div>
                       <p className="panel-label">Your Hand</p>
                       <p className="text-sm text-slate-100/74">
-                        Tap or click to build a move. On smaller screens the hand stays horizontally scrollable.
+                        Tap or click to build a move. The hand compresses to fit larger screens and stays scrollable only when space gets tight.
                       </p>
                     </div>
                     <div className="rounded-full border border-white/10 bg-black/16 px-3 py-1 text-xs text-slate-100/72">
@@ -445,7 +478,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
           </div>
         </section>
 
-        <aside className="flex flex-col gap-4 2xl:absolute 2xl:right-4 2xl:top-0 2xl:w-[360px]">
+        <aside className="flex flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
           <GameLog log={gameState.gameLog} />
 
           <div className="glass-panel rounded-[1.75rem] p-4 sm:p-5">
@@ -458,7 +491,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                 Format: <span className="font-semibold text-white">{room?.players.length === 3 ? "3-player joker deck" : "4-player standard deck"}</span>
               </p>
               <p>
-                Seat: <span className="font-semibold text-white">{southPlayer.name}</span>
+                Seat: <span className="font-semibold text-white">{currentSeatLabel}</span>
               </p>
               <p>
                 Current lead: <span className="font-semibold text-white">{lastPlayedPlayer?.name ?? "Open table"}</span>

@@ -41,7 +41,7 @@ export function PlayerSeat({
   return (
     <motion.div
       className={[
-        "glass-panel relative overflow-hidden rounded-[1.75rem] px-4 py-3 text-center transition-colors sm:px-5",
+        "glass-panel relative w-full max-w-[320px] overflow-hidden rounded-[1.75rem] px-4 py-3 text-center transition-colors sm:px-5",
         active ? "gold-ring border-amber-200/35" : "",
         disconnected ? "border-rose-200/18 opacity-70" : "",
       ].join(" ")}

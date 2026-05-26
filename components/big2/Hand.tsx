@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card as PlayingCard } from "@/components/big2/Card";
 import { Card } from "@/lib/big2/types";
 
@@ -22,26 +23,57 @@ export function Hand({
   interactive = false,
   dealt = true,
 }: HandProps) {
-  const overlap = cards.length > 10 ? 66 : 76;
-  const selectedSpread = 14;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const compactMode = cards.length >= 16;
+  const cardWidth = compactMode ? 96 : 112;
+  const baseSpacing = compactMode ? 50 : cards.length > 12 ? 62 : 76;
   const playableSet = new Set(playableIds);
-  const slotWidths = cards.map((card, index) =>
-    index === cards.length - 1 ? 112 : overlap + (selectedIds.includes(card.id) ? selectedSpread : 0),
-  );
-  const positions = slotWidths.reduce<number[]>((accumulator, width, index) => {
-    if (index === 0) {
-      accumulator.push(0);
-      return accumulator;
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
     }
 
-    accumulator.push(accumulator[index - 1] + slotWidths[index - 1]);
-    return accumulator;
+    const element = containerRef.current;
+    const updateWidth = () => setContainerWidth(element.clientWidth);
+
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+
+    return () => observer.disconnect();
   }, []);
-  const width = Math.max(180, (positions.at(-1) ?? 0) + 112);
+
+  const spacing = useMemo(() => {
+    if (cards.length <= 1 || containerWidth === 0) {
+      return baseSpacing;
+    }
+
+    const availableWidth = Math.max(cardWidth, containerWidth - 12);
+    const fittedSpacing = Math.floor((availableWidth - cardWidth) / (cards.length - 1));
+
+    return Math.max(28, Math.min(baseSpacing, fittedSpacing));
+  }, [baseSpacing, cardWidth, cards.length, containerWidth]);
+
+  const positions = useMemo(
+    () => cards.map((_, index) => index * spacing),
+    [cards, spacing],
+  );
+  const width = Math.max(cardWidth, (positions.at(-1) ?? 0) + cardWidth);
+  const shouldScroll = containerWidth > 0 && width > containerWidth;
+  const handHeightClass = compactMode ? "h-48" : "h-56";
 
   return (
-    <div className="mx-auto w-full overflow-x-auto overflow-y-visible px-2 pb-4 pt-8 sm:px-3">
-      <div className="relative mx-auto h-56 min-w-max" style={{ width }}>
+    <div
+      ref={containerRef}
+      className={[
+        "mx-auto w-full overflow-y-visible px-1 pb-3 pt-5 sm:px-2",
+        shouldScroll ? "overflow-x-auto" : "overflow-x-hidden",
+      ].join(" ")}
+    >
+      <div className={`relative mx-auto min-w-max ${handHeightClass}`} style={{ width }}>
         {cards.map((card, index) => {
           const selected = selectedIds.includes(card.id);
           const offset = positions[index] ?? 0;
@@ -62,6 +94,7 @@ export function Hand({
                 playable={interactive && playableSet.has(card.id)}
                 interactive={interactive}
                 onClick={onCardClick ? () => onCardClick(card) : undefined}
+                size={compactMode ? "compact" : "md"}
                 delay={dealt ? index * 0.045 : 0}
                 initialOffset={{ x: 0, y: 140, rotate: 0 }}
               />
