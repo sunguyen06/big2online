@@ -87,4 +87,4 @@ Search for comments mentioning `Placeholder` to find the intended swap points fo
 - The opening move must include the 3 of Diamonds
 - Passing is not allowed while starting a fresh trick
 - In 3-player private rooms, jokers are added with `Red Joker > Black Joker > all 2s`
-- The two jokers together can be played at any time to beat any active move
+- The two jokers together can be played at any time to beat any active move 
