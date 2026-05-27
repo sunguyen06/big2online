@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MULTIPLAYER_EVENTS } from "./events";
 import { toFriendlyGameMessage, toFriendlyLobbyMessage } from "./messages";
 import { emitWithAck, getLobbySocket } from "./socket-client";
+import { useLobbyWakeup } from "./useLobbyWakeup";
 import {
   clearLobbySession,
   loadGameSnapshot,
@@ -56,6 +57,8 @@ export function useMultiplayerGame(roomCodeFromRoute: string) {
 
   const currentPlayerId =
     initialSession?.roomCode === normalizedRouteCode ? initialSession.playerId : null;
+
+  useLobbyWakeup(!!initialSession && !!currentPlayerId);
 
   const flashMessage = (message: string) => {
     setFeedbackMessage(message);

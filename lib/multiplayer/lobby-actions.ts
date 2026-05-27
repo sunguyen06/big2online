@@ -2,10 +2,24 @@
 
 import { MULTIPLAYER_EVENTS } from "./events";
 import { toFriendlyLobbyMessage } from "./messages";
+import { getLobbyHealthUrl } from "./server-url";
 import { CreateRoomRequest, JoinRoomRequest, LobbyJoinSuccess } from "./types";
 import { emitWithAck, getLobbySocket } from "./socket-client";
 import { clearLobbySession, saveLobbySession, saveRoomSnapshot } from "./session";
 import { normalizeRoomCode, sanitizeDisplayName } from "./utils";
+
+async function wakeLobbyServer() {
+  try {
+    await fetch(getLobbyHealthUrl(), {
+      cache: "no-store",
+      credentials: "omit",
+      mode: "no-cors",
+    });
+  } catch {
+    // Best-effort only. Socket.IO will continue reconnecting if the server
+    // is still starting up when a player creates or joins a room.
+  }
+}
 
 async function ensureSocketConnected() {
   const socket = getLobbySocket();
@@ -13,6 +27,8 @@ async function ensureSocketConnected() {
   if (socket.connected) {
     return socket;
   }
+
+  void wakeLobbyServer();
 
   await new Promise<void>((resolve, reject) => {
     const timeout = window.setTimeout(() => {

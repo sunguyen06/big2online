@@ -2,24 +2,10 @@
 
 import { io, Socket } from "socket.io-client";
 import { SocketAck } from "./types";
+import { getLobbyServerUrl } from "./server-url";
 
 let lobbySocket: Socket | null = null;
 const DEFAULT_ACK_TIMEOUT_MS = 4500;
-
-function getLobbyServerUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_LOBBY_SERVER_URL?.trim();
-
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/$/, "");
-  }
-
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
-    return `http://${host}:8000`;
-  }
-
-  return "http://localhost:8000";
-}
 
 export function getLobbySocket() {
   if (!lobbySocket) {

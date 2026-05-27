@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MULTIPLAYER_EVENTS } from "./events";
 import { toFriendlyLobbyMessage } from "./messages";
 import { emitWithAck, getLobbySocket } from "./socket-client";
+import { useLobbyWakeup } from "./useLobbyWakeup";
 import {
   clearLobbySession,
   loadLobbySession,
@@ -40,6 +41,8 @@ export function useRoomLobby(roomCodeFromRoute: string) {
 
   const currentPlayerId =
     initialSession?.roomCode === normalizedRouteCode ? initialSession.playerId : null;
+
+  useLobbyWakeup(!!initialSession && !!currentPlayerId);
 
   useEffect(() => {
     if (!currentPlayerId || !initialSession) {
