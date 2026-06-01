@@ -343,11 +343,17 @@ export function applyMove(gameState: GameState, playerId: number, selectedCards:
       : currentPlayer,
   );
 
-  const winner = checkWinner({ ...gameState, players: nextPlayers });
-  const nextCurrentPlayer = winner === null ? getNextPlayerIndex(gameState) : playerId;
+  const nextFinishedOrder =
+    nextPlayers[playerId]?.hand.length === 0 && !gameState.finishedOrder.includes(playerId)
+      ? [...gameState.finishedOrder, playerId]
+      : [...gameState.finishedOrder];
+  const nextStateForRouting = { ...gameState, players: nextPlayers, finishedOrder: nextFinishedOrder };
+  const winner = checkWinner(nextStateForRouting);
+  const nextCurrentPlayer = winner === null ? getNextActivePlayerIndex(nextStateForRouting, playerId) : winner;
   const nextState = syncLegacyFields({
     ...gameState,
     players: nextPlayers,
+    finishedOrder: nextFinishedOrder,
     status: winner === null ? "playing" : "ended",
     winner,
     turnCount: gameState.turnCount + 1,
@@ -386,25 +392,32 @@ export function applyPass(gameState: GameState, playerId: number): GameState {
 
   const nextPassCount = gameState.turn.passesInRow + 1;
   const withPassLog = appendLog(gameState, makeLog(`${gameState.players[playerId].name} passed.`, "pass"));
+  const activePlayerCount = getActivePlayerCount(withPassLog);
 
-  if (nextPassCount < gameState.players.length - 1) {
+  if (nextPassCount < activePlayerCount - 1) {
     return syncLegacyFields({
       ...withPassLog,
       turnCount: withPassLog.turnCount + 1,
       turn: {
         ...withPassLog.turn,
-        currentPlayer: getNextPlayerIndex(withPassLog),
+        currentPlayer: getNextActivePlayerIndex(withPassLog, playerId),
         passesInRow: nextPassCount,
       },
     });
   }
+
+  const leadPlayer = withPassLog.turn.lastValidPlayPlayer;
+  const nextLeadPlayer =
+    withPassLog.players[leadPlayer]?.hand.length > 0
+      ? leadPlayer
+      : getNextActivePlayerIndex(withPassLog, leadPlayer);
 
   const clearedState = syncLegacyFields({
     ...withPassLog,
     turnCount: withPassLog.turnCount + 1,
     turn: {
       ...withPassLog.turn,
-      currentPlayer: withPassLog.turn.lastValidPlayPlayer,
+      currentPlayer: nextLeadPlayer,
       currentMove: null,
       currentMovePlayer: null,
       passesInRow: 0,
@@ -423,8 +436,11 @@ export function getNextPlayerIndex(gameState: GameState): number {
 }
 
 export function checkWinner(gameState: GameState): number | null {
-  const winnerIndex = gameState.players.findIndex((player) => player.hand.length === 0);
-  return winnerIndex === -1 ? null : winnerIndex;
+  if (gameState.finishedOrder.length !== gameState.players.length - 1) {
+    return null;
+  }
+
+  return gameState.finishedOrder[0] ?? null;
 }
 
 export function createInitialGameState(): GameState {
@@ -467,6 +483,7 @@ export function createGameStateForPlayers(
     players,
     status: "dealing",
     winner: null,
+    finishedOrder: [],
     log: [
       makeLog(`${players[starter].name} holds 3 of Diamonds and starts the round.`, "system"),
       ...(includeJokers
@@ -709,6 +726,22 @@ function compareStrength(left: number[], right: number[]): number {
   }
 
   return 0;
+}
+
+function getActivePlayerCount(gameState: GameState): number {
+  return gameState.players.filter((player) => player.hand.length > 0).length;
+}
+
+function getNextActivePlayerIndex(gameState: GameState, fromPlayerIndex: number): number {
+  for (let offset = 1; offset <= gameState.players.length; offset += 1) {
+    const candidateIndex = (fromPlayerIndex + offset) % gameState.players.length;
+
+    if (gameState.players[candidateIndex]?.hand.length > 0) {
+      return candidateIndex;
+    }
+  }
+
+  return fromPlayerIndex;
 }
 
 function isDoubleJokerMove(cards: Card[]): boolean {

@@ -83,6 +83,7 @@ export interface PublicGameState {
   gameLog: LogEntry[];
   lastAction: RecentGameAction | null;
   lastPlayedPlayerId: string | null;
+  finishedOrder: string[];
   players: PublicGamePlayer[];
   roomCode: string;
   startedAt: number;

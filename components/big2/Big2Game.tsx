@@ -3,7 +3,6 @@
 import { startTransition, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { GameControls } from "@/components/big2/GameControls";
-import { GameLog } from "@/components/big2/GameLog";
 import { Hand } from "@/components/big2/Hand";
 import { PlayerSeat } from "@/components/big2/PlayerSeat";
 import { PlayedCards } from "@/components/big2/PlayedCards";
@@ -140,6 +139,10 @@ export function Big2Game() {
   const playableCardIds = [...getPlayableCardIds(game, 0, selectedCards)];
   const canPass = game.phase === "playing" && game.winner === null && game.currentPlayer === 0 && game.currentTrick !== null;
   const winnerName = game.winner !== null ? game.players[game.winner].name : null;
+  const placements =
+    game.winner !== null
+      ? buildPlacements(game.players.map((player) => player.name), game.finishedOrder)
+      : [];
   const playedBy = game.currentTrickPlayer !== null ? game.players[game.currentTrickPlayer] : null;
 
   const toggleCard = (cardId: string) => {
@@ -282,13 +285,11 @@ export function Big2Game() {
               </div>
             </div>
 
-            <WinnerModal actionLabel="Deal Another Round" onAction={handleRestart} winnerName={winnerName} />
+            <WinnerModal actionLabel="Deal Another Round" onAction={handleRestart} placements={placements} winnerName={winnerName} />
           </div>
         </section>
 
         <aside className="flex flex-col gap-4">
-          <GameLog log={game.log} />
-
           <div className="glass-panel rounded-[1.75rem] p-4 sm:p-5">
             <p className="text-[11px] uppercase tracking-[0.26em] text-emerald-100/55">House Rules</p>
             <h2 className="mt-1 text-xl font-semibold text-white">This Build</h2>
@@ -302,4 +303,37 @@ export function Big2Game() {
       </div>
     </main>
   );
+}
+
+function buildPlacements(playerNames: string[], finishedOrder: number[]) {
+  const activePlayerIndex = playerNames.findIndex((_, index) => !finishedOrder.includes(index));
+  const finishingOrder = [...finishedOrder, activePlayerIndex].filter((index): index is number => index >= 0);
+
+  return finishingOrder.map((playerIndex, orderIndex) => ({
+    name: playerNames[playerIndex] ?? `Player ${playerIndex + 1}`,
+    place: orderIndex + 1,
+    summary:
+      orderIndex === 0
+        ? "Cleared their hand first."
+        : playerIndex === activePlayerIndex
+          ? "Last player standing."
+          : `Finished ${ordinal(orderIndex + 1)}.`,
+  }));
+}
+
+function ordinal(place: number) {
+  if (place % 100 >= 11 && place % 100 <= 13) {
+    return `${place}th`;
+  }
+
+  switch (place % 10) {
+    case 1:
+      return `${place}st`;
+    case 2:
+      return `${place}nd`;
+    case 3:
+      return `${place}rd`;
+    default:
+      return `${place}th`;
+  }
 }

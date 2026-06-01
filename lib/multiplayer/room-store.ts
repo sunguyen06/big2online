@@ -696,6 +696,7 @@ export class LobbyRoomStore {
     return {
       currentMove: game.state.turn.currentMove,
       currentTurnPlayerId,
+      finishedOrder: game.state.finishedOrder.map((playerIndex) => game.playerOrder[playerIndex]),
       gameLog: game.state.log,
       lastAction: game.lastAction,
       lastPlayedPlayerId,

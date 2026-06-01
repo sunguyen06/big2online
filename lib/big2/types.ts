@@ -77,6 +77,7 @@ export interface GameState {
   status: GameStatus;
   turn: TurnState;
   winner: number | null;
+  finishedOrder: number[];
   log: LogEntry[];
   turnCount: number;
   currentPlayer: number;

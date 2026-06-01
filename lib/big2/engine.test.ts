@@ -44,6 +44,7 @@ function buildState(players: Player[]): GameState {
     players,
     status: "playing",
     winner: null,
+    finishedOrder: [],
     log: [],
     turnCount: 0,
     turn: {
@@ -198,6 +199,24 @@ function run(): void {
   assert.equal(afterPassThree.currentTrick, null, "The center should clear after three consecutive passes.");
   assert.equal(afterPassThree.currentPlayer, 0, "The last player to make a valid play should start the next trick.");
   assert.equal(afterPassThree.passStreak, 0, "Pass count should reset after the trick clears.");
+
+  const firstPlaceState = buildState([
+    buildPlayer(0, [threeOfDiamonds]),
+    buildPlayer(1, [getCard("4", "Diamonds")]),
+    buildPlayer(2, [getCard("6", "Diamonds")]),
+    buildPlayer(3, [getCard("7", "Diamonds")]),
+  ]);
+  const afterFirstPlace = applyMove(firstPlaceState, 0, [threeOfDiamonds]);
+
+  assert.equal(afterFirstPlace.winner, null, "The round should continue after the first player finishes.");
+  assert.equal(afterFirstPlace.currentPlayer, 1, "The next active player should take the turn after a player finishes.");
+  assert.equal(afterFirstPlace.finishedOrder[0], 0, "The first finisher should be tracked separately.");
+
+  const afterFirstPass = applyPass(afterFirstPlace, 1);
+  const afterSecondPass = applyPass(afterFirstPass, 2);
+
+  assert.equal(afterSecondPass.currentTrick, null, "The center should clear after the remaining active players pass.");
+  assert.equal(afterSecondPass.currentPlayer, 1, "A finished player should be skipped when the next trick starts.");
 
   console.log("Big 2 engine tests passed.");
 }

@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { GameLog } from "@/components/big2/GameLog";
 import { Hand } from "@/components/big2/Hand";
 import { PlayerSeat } from "@/components/big2/PlayerSeat";
 import { PlayedCards } from "@/components/big2/PlayedCards";
@@ -109,6 +108,10 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
     gameState?.lastPlayedPlayerId ? tablePlayers.find((player) => player.id === gameState.lastPlayedPlayerId) ?? null : null;
   const winnerPlayer =
     gameState?.winnerPlayerId ? gameState.players.find((player) => player.id === gameState.winnerPlayerId) ?? null : null;
+  const placements =
+    gameState && gameState.winnerPlayerId
+      ? buildPlacements(gameState.players, gameState.finishedOrder)
+      : [];
   const selectedCards = privateHand.filter((card) => selectedIds.includes(card.id));
   const disconnectedPlayers = gameState?.players.filter((player) => !player.connected) ?? [];
   const waitingForReconnect = !!currentTurnPlayer && !currentTurnPlayer.connected && gameState?.winnerPlayerId === null;
@@ -473,14 +476,13 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
               onAction={winnerPlayer && currentRoomPlayer?.isHost ? restartRound : leaveRoom}
               onSecondaryAction={winnerPlayer && currentRoomPlayer?.isHost ? leaveRoom : undefined}
               secondaryActionLabel={winnerPlayer && currentRoomPlayer?.isHost ? "Leave Table" : undefined}
+              placements={placements}
               winnerName={winnerPlayer?.name ?? null}
             />
           </div>
         </section>
 
         <aside className="flex flex-col gap-3 lg:min-h-0 lg:overflow-hidden">
-          <GameLog log={gameState.gameLog} />
-
           <div className="glass-panel rounded-[1.75rem] p-4 sm:p-5">
             <p className="panel-label">Table Status</p>
             <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-100/74">
@@ -544,4 +546,44 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
       </div>
     </main>
   );
+}
+
+function buildPlacements(
+  players: Array<{ id: string; name: string }>,
+  finishedOrder: string[],
+): Array<{ name: string; place: number; summary: string }> {
+  const activePlayerId = players.find((player) => !finishedOrder.includes(player.id))?.id ?? null;
+  const finishingOrder = [...finishedOrder, activePlayerId].filter((playerId): playerId is string => !!playerId);
+
+  return finishingOrder.map((playerId, orderIndex) => {
+    const playerName = players.find((player) => player.id === playerId)?.name ?? "Unknown player";
+
+    return {
+      name: playerName,
+      place: orderIndex + 1,
+      summary:
+        orderIndex === 0
+          ? "Cleared their hand first."
+          : playerId === activePlayerId
+            ? "Last player standing."
+            : `Finished ${ordinal(orderIndex + 1)}.`,
+    };
+  });
+}
+
+function ordinal(place: number) {
+  if (place % 100 >= 11 && place % 100 <= 13) {
+    return `${place}th`;
+  }
+
+  switch (place % 10) {
+    case 1:
+      return `${place}st`;
+    case 2:
+      return `${place}nd`;
+    case 3:
+      return `${place}rd`;
+    default:
+      return `${place}th`;
+  }
 }

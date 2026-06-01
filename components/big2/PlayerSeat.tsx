@@ -72,6 +72,11 @@ export function PlayerSeat({
         <div className="text-left">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-100/92">{player.name}</p>
+            {active ? (
+              <span className="rounded-full border border-amber-200/30 bg-amber-300/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-50 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+                Turn
+              </span>
+            ) : null}
             {isLead ? (
               <span className="rounded-full border border-emerald-200/25 bg-emerald-400/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
                 Lead
