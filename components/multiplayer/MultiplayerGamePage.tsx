@@ -434,19 +434,17 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
               </div>
 
               <div className="lg:col-span-3 lg:row-start-4">
-                <motion.div
+                <div
                   className="glass-panel rounded-[1.8rem] px-3 pb-1 pt-2.5 sm:px-4"
                   style={
                     isMyTurn
                       ? {
-                          background: "linear-gradient(180deg, rgba(127, 29, 29, 0.88) 0%, rgba(69, 10, 10, 0.56) 100%)",
-                          borderColor: "rgba(252, 165, 165, 0.6)",
-                          boxShadow: "0 0 0 1px rgba(244, 63, 94, 0.34), 0 18px 44px rgba(0, 0, 0, 0.3)",
+                          background: "rgba(59, 165, 91, 0.5)",
+                          borderColor: "rgba(59, 165, 91, 0.7)",
+                          boxShadow: "0 0 0 1px rgba(59, 165, 91, 0.32), 0 0 26px rgba(59, 165, 91, 0.25), 0 18px 44px rgba(0, 0, 0, 0.3)",
                         }
                       : undefined
                   }
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
                 >
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -468,7 +466,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                     onCardClick={handleToggleCard}
                     selectedIds={selectedIds}
                   />
-                </motion.div>
+                </div>
               </div>
             </div>
 
