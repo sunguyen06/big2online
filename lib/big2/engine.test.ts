@@ -242,6 +242,23 @@ function run(): void {
   assert.equal(threePlayerState.players.length, 3, "Three-player state creation should preserve the requested table size.");
   assert.ok(threePlayerState.players.every((player) => player.hand.length === 18), "Three-player state should deal 18 cards per player.");
 
+  const rematchState = createGameStateForPlayers(
+    [
+      { id: 0, name: "P1", kind: "human", seat: "south" },
+      { id: 1, name: "P2", kind: "human", seat: "west" },
+      { id: 2, name: "P3", kind: "human", seat: "north" },
+      { id: 3, name: "P4", kind: "human", seat: "east" },
+    ],
+    () => 0.5,
+    {
+      openingMoveRequiresThreeOfDiamonds: false,
+      starterIndex: 2,
+    },
+  );
+
+  assert.equal(rematchState.turn.currentPlayer, 2, "A restarted private hand should start with the previous winner.");
+  assert.equal(rematchState.turn.isFirstTurn, false, "A restarted private hand should not require the 3 of Diamonds opening rule.");
+
   const initialState = buildState([
     buildPlayer(0, [threeOfDiamonds, getCard("5", "Clubs")]),
     buildPlayer(1, [getCard("4", "Diamonds")]),

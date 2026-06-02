@@ -485,11 +485,16 @@ export function createGameStateForPlayers(
     seat?: Player["seat"];
   }>,
   random: () => number = Math.random,
+  options: {
+    openingMoveRequiresThreeOfDiamonds?: boolean;
+    starterIndex?: number;
+  } = {},
 ): GameState {
   if (playersInput.length < MIN_PLAYER_COUNT || playersInput.length > MAX_PLAYER_COUNT) {
     throw new Error(`Expected ${MIN_PLAYER_COUNT} or ${MAX_PLAYER_COUNT} players, received ${playersInput.length}.`);
   }
 
+  const openingMoveRequiresThreeOfDiamonds = options.openingMoveRequiresThreeOfDiamonds ?? true;
   const includeJokers = playersInput.length === MIN_PLAYER_COUNT;
   const deck = shuffleDeck(createDeck({ includeJokers }), random);
   const hands = dealCards(deck, playersInput.length).map((hand) => sortCards(hand));
@@ -500,36 +505,60 @@ export function createGameStateForPlayers(
     name: player.name,
     seat: player.seat ?? DEFAULT_SEAT_ORDER[index] ?? "south",
   }));
-  const starter = players.findIndex((player) => player.hand.some((card) => card.id === THREE_OF_DIAMONDS_ID));
+  const starter =
+    typeof options.starterIndex === "number"
+      ? options.starterIndex
+      : players.findIndex((player) => player.hand.some((card) => card.id === THREE_OF_DIAMONDS_ID));
+  const openingStarter = starter >= 0 ? starter : 0;
+  const starterName = players[openingStarter]?.name ?? `Player ${openingStarter + 1}`;
+  const logEntries = openingMoveRequiresThreeOfDiamonds
+    ? [
+        makeLog(`${starterName} holds 3 of Diamonds and starts the round.`, "system"),
+        ...(includeJokers
+          ? [
+              makeLog(
+                "Three-player house rule: two jokers are added to the deck. Jokers can only be played as singles or as a pair.",
+                "system",
+              ),
+            ]
+          : []),
+        makeLog("House rule: straights run from 3-4-5-6-7 up to 10-J-Q-K-A. 2 cannot be used in a straight.", "system"),
+      ]
+    : [
+        makeLog(`${starterName} starts the next hand.`, "system"),
+        ...(includeJokers
+          ? [
+              makeLog(
+                "Three-player house rule: two jokers are added to the deck. Jokers can only be played as singles or as a pair.",
+                "system",
+              ),
+            ]
+          : []),
+        makeLog("House rule: straights run from 3-4-5-6-7 up to 10-J-Q-K-A. 2 cannot be used in a straight.", "system"),
+      ];
 
   return syncLegacyFields({
     players,
     status: "dealing",
     winner: null,
     finishedOrder: [],
-    log: [
-      makeLog(`${players[starter].name} holds 3 of Diamonds and starts the round.`, "system"),
-      ...(includeJokers
-        ? [makeLog("Three-player house rule: two jokers are added to the deck. Jokers can only be played as singles or as a pair.", "system")]
-        : []),
-      makeLog("House rule: straights run from 3-4-5-6-7 up to 10-J-Q-K-A. 2 cannot be used in a straight.", "system"),
-    ],
+    log: logEntries,
     turnCount: 0,
     turn: {
-      currentPlayer: starter,
+      currentPlayer: openingStarter,
       currentMove: null,
       currentMovePlayer: null,
-      lastValidPlayPlayer: starter,
+      lastValidPlayPlayer: openingStarter,
       passesInRow: 0,
       isStartingTrick: true,
-      isFirstTurn: true,
+      isFirstTurn: openingMoveRequiresThreeOfDiamonds,
     },
-    currentPlayer: starter,
-    leadPlayer: starter,
+    currentPlayer: openingStarter,
+    leadPlayer: openingStarter,
     currentTrick: null,
     currentTrickPlayer: null,
     passStreak: 0,
-    firstTurn: true,
+    firstTurn: openingMoveRequiresThreeOfDiamonds,
     phase: "dealing",
   });
 }

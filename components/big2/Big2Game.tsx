@@ -137,6 +137,7 @@ export function Big2Game() {
   const selectedCards = humanPlayer.hand.filter((card) => selectedIds.includes(card.id));
   const validation = getSelectionValidation(game, 0, selectedCards);
   const playableCardIds = [...getPlayableCardIds(game, 0, selectedCards)];
+  const isPlayerTurn = game.phase === "playing" && game.winner === null && game.currentPlayer === 0;
   const canPass = game.phase === "playing" && game.winner === null && game.currentPlayer === 0 && game.currentTrick !== null;
   const winnerName = game.winner !== null ? game.players[game.winner].name : null;
   const placements =
@@ -266,6 +267,15 @@ export function Big2Game() {
               <div className="col-span-3 row-start-4">
                 <motion.div
                   className="glass-panel rounded-[1.8rem] px-3 pb-2 pt-4 sm:px-5"
+                  style={
+                    isPlayerTurn
+                      ? {
+                          background: "linear-gradient(180deg, rgba(127, 29, 29, 0.88) 0%, rgba(69, 10, 10, 0.56) 100%)",
+                          borderColor: "rgba(252, 165, 165, 0.6)",
+                          boxShadow: "0 0 0 1px rgba(244, 63, 94, 0.34), 0 18px 44px rgba(0, 0, 0, 0.3)",
+                        }
+                      : undefined
+                  }
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                 >

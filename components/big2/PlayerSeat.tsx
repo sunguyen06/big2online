@@ -42,7 +42,9 @@ export function PlayerSeat({
     <motion.div
       className={[
         "glass-panel relative w-full max-w-[320px] overflow-hidden rounded-[1.75rem] px-4 py-3 text-center transition-colors sm:px-5",
-        active ? "gold-ring border-amber-200/35" : "",
+        active
+          ? "border-rose-200/55 bg-[linear-gradient(180deg,rgba(127,29,29,0.34),rgba(10,10,10,0.18))] shadow-[0_0_0_1px_rgba(244,63,94,0.32),0_0_32px_rgba(244,63,94,0.2)]"
+          : "",
         disconnected ? "border-rose-200/18 opacity-70" : "",
       ].join(" ")}
       animate={active ? { scale: [1, 1.018, 1] } : { scale: 1 }}
@@ -65,7 +67,7 @@ export function PlayerSeat({
             {avatar.label}
           </div>
           {active ? (
-            <span className="animate-soft-pulse absolute -inset-1 rounded-full border border-amber-200/45" />
+            <span className="animate-soft-pulse absolute -inset-1 rounded-full border border-rose-200/45" />
           ) : null}
         </div>
 
@@ -73,7 +75,7 @@ export function PlayerSeat({
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-100/92">{player.name}</p>
             {active ? (
-              <span className="rounded-full border border-amber-200/30 bg-amber-300/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-50 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+              <span className="rounded-full border border-rose-200/30 bg-rose-300/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-50 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
                 Turn
               </span>
             ) : null}

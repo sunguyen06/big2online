@@ -436,6 +436,15 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
               <div className="lg:col-span-3 lg:row-start-4">
                 <motion.div
                   className="glass-panel rounded-[1.8rem] px-3 pb-1 pt-2.5 sm:px-4"
+                  style={
+                    isMyTurn
+                      ? {
+                          background: "linear-gradient(180deg, rgba(127, 29, 29, 0.88) 0%, rgba(69, 10, 10, 0.56) 100%)",
+                          borderColor: "rgba(252, 165, 165, 0.6)",
+                          boxShadow: "0 0 0 1px rgba(244, 63, 94, 0.34), 0 18px 44px rgba(0, 0, 0, 0.3)",
+                        }
+                      : undefined
+                  }
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                 >

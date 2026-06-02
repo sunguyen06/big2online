@@ -82,7 +82,10 @@ export function Hand({
         shouldScroll ? "overflow-x-auto" : "overflow-x-hidden",
       ].join(" ")}
     >
-      <div className={`relative mx-auto min-w-max ${handHeightClass}`} style={{ width }}>
+      <div
+        className={["relative mx-auto min-w-max", handHeightClass].join(" ")}
+        style={{ width }}
+      >
         {cards.map((card, index) => {
           const selected = selectedSet.has(card.id);
           const offset = positions[index] ?? 0;

@@ -529,6 +529,9 @@ export class LobbyRoomStore {
   }
 
   private beginRound(room: RoomState, playerId: string): GameStartedPayload {
+    const isFirstHandOfTable = room.game === null;
+    const previousWinnerIndex =
+      room.game?.state.finishedOrder[0] ?? room.game?.state.winner ?? null;
     const state = setPhase(
       createGameStateForPlayers(
         room.players.map((entry, index) => ({
@@ -537,6 +540,11 @@ export class LobbyRoomStore {
           name: entry.name,
           seat: SEAT_BY_INDEX[index],
         })),
+        Math.random,
+        {
+          openingMoveRequiresThreeOfDiamonds: isFirstHandOfTable,
+          starterIndex: isFirstHandOfTable ? undefined : previousWinnerIndex ?? undefined,
+        },
       ),
       "playing",
     );
