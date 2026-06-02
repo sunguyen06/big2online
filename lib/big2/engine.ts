@@ -146,6 +146,21 @@ export function identifyMove(cards: Card[]): Move | null {
     );
   }
 
+  if (sorted.length === 4 && sorted.every((card) => card.rank === sorted[0].rank)) {
+    const topCard = sorted[3];
+
+    return createMove(
+      sorted,
+      "four-of-a-kind",
+      0,
+      sorted[0].rank,
+      undefined,
+      topCard.suit,
+      [sorted[0].rank, topCard.suit],
+      `four of a kind, ${getRankName(sorted[0].rank, true)}`,
+    );
+  }
+
   if (sorted.length !== 5) {
     return null;
   }
@@ -293,6 +308,14 @@ export function canPlayMove(
 
   if (currentMove.isBomb) {
     return { valid: false, message: "Selected cards do not beat the current move.", move };
+  }
+
+  if (isFourCardFourOfAKind(move)) {
+    if (currentMove.cardCount < 5) {
+      return { valid: true, message: `${move.summary} beats the current move.`, move };
+    }
+
+    return { valid: false, message: "You must match the number of cards in the current move.", move };
   }
 
   if (move.cardCount !== currentMove.cardCount) {
@@ -758,7 +781,11 @@ function playerHasCards(player: Player, cards: Card[]): boolean {
 }
 
 function getLegalMoves(hand: Card[], state: GameState): Move[] {
-  return [1, 2, 3, 5]
+  const canUseFourCardMove =
+    !state.turn.currentMove || (!state.turn.currentMove.isBomb && state.turn.currentMove.cardCount < 5);
+  const sizes = canUseFourCardMove ? [1, 2, 3, 4, 5] : [1, 2, 3, 5];
+
+  return sizes
     .flatMap((size) => buildCombinations(hand, size))
     .map((cards) => identifyMove(cards))
     .filter((move): move is Move => move !== null)
@@ -788,7 +815,7 @@ function buildCombinations(cards: Card[], size: number): Card[][] {
 }
 
 function openingMovePriority(cardCount: Move["cardCount"]): number {
-  return { 1: 1, 2: 2, 3: 3, 5: 4 }[cardCount];
+  return { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 }[cardCount];
 }
 
 function appendLog(state: GameState, entry: LogEntry): GameState {
@@ -817,6 +844,10 @@ function syncLegacyFields(state: GameState): GameState {
     firstTurn: state.turn.isFirstTurn,
     phase: state.status,
   };
+}
+
+function isFourCardFourOfAKind(move: Move): boolean {
+  return move.type === "four-of-a-kind" && move.cardCount === 4;
 }
 
 function getStandardRankLabel(rank: CardRank) {

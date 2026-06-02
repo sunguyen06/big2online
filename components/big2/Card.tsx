@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { memo } from "react";
 import { getCardLabel } from "@/lib/big2/engine";
 import { Card as GameCard } from "@/lib/big2/types";
 
@@ -24,7 +24,7 @@ const sizeClasses = {
   md: "h-32 w-[92px] sm:h-36 sm:w-[100px] lg:h-40 lg:w-[112px]",
 };
 
-export function Card({
+function CardView({
   card,
   faceDown = false,
   selected = false,
@@ -32,10 +32,7 @@ export function Card({
   interactive = false,
   onClick,
   size = "md",
-  delay = 0,
-  initialOffset,
   className = "",
-  animationKey,
 }: CardProps) {
   const isJoker = !!card?.isJoker;
   const isRed = isJoker ? card?.jokerColor === "red" : card?.suit === 0 || card?.suit === 2;
@@ -109,49 +106,51 @@ export function Card({
     </div>
   );
 
-  const animationProps = {
-    initial: {
-      opacity: 0,
-      scale: 0.8,
-      x: initialOffset?.x ?? 0,
-      y: initialOffset?.y ?? 24,
-      rotate: initialOffset?.rotate ?? 0,
-    },
-    animate: {
-      opacity: 1,
-      scale: selected ? 1.02 : playable ? 1.01 : 1,
-      y: selected ? -16 : 0,
-      x: 0,
-      rotate: 0,
-    },
-    transition: {
-      delay,
-      duration: 0.35,
-      type: "spring" as const,
-      stiffness: 320,
-      damping: 28,
-    },
-    whileHover: interactive ? { y: selected ? -18 : -6, scale: 1.02 } : undefined,
-    whileTap: interactive ? { scale: 0.98 } : undefined,
-  };
-
   if (interactive && onClick) {
     return (
-      <motion.button
-        key={animationKey}
+      <button
         type="button"
         onClick={onClick}
-        className="relative rounded-[1.25rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
-        {...animationProps}
+        className={[
+          "relative rounded-[1.25rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200",
+          selected ? "ring-2 ring-emerald-300/90 shadow-[0_0_0_1px_rgba(110,231,183,0.35),0_18px_42px_rgba(16,185,129,0.28)]" : "",
+        ].join(" ")}
       >
         {frame}
-      </motion.button>
+      </button>
     );
   }
 
   return (
-    <motion.div key={animationKey} {...animationProps}>
+    <div
+      className={[
+        selected ? "ring-2 ring-emerald-300/90 shadow-[0_0_0_1px_rgba(110,231,183,0.35),0_18px_42px_rgba(16,185,129,0.28)]" : "",
+      ].join(" ")}
+    >
       {frame}
-    </motion.div>
+    </div>
   );
 }
+
+function areOffsetsEqual(
+  left?: { x?: number; y?: number; rotate?: number },
+  right?: { x?: number; y?: number; rotate?: number },
+) {
+  return left?.x === right?.x && left?.y === right?.y && left?.rotate === right?.rotate;
+}
+
+export const Card = memo(CardView, (previous, next) => {
+  return (
+    previous.card === next.card &&
+    previous.faceDown === next.faceDown &&
+    previous.selected === next.selected &&
+    previous.playable === next.playable &&
+    previous.interactive === next.interactive &&
+    previous.size === next.size &&
+    previous.delay === next.delay &&
+    previous.className === next.className &&
+    previous.animationKey === next.animationKey &&
+    previous.onClick === next.onClick &&
+    areOffsetsEqual(previous.initialOffset, next.initialOffset)
+  );
+});

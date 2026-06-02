@@ -88,6 +88,17 @@ function run(): void {
     "Four-card selections should be rejected.",
   );
 
+  const fourCardBomb = identifyMove([
+    getCard("Q", "Diamonds"),
+    getCard("Q", "Clubs"),
+    getCard("Q", "Hearts"),
+    getCard("Q", "Spades"),
+  ]);
+
+  assert.ok(fourCardBomb, "Expected four of a kind to be a valid four-card move.");
+  assert.equal(fourCardBomb.cardCount, 4, "Four of a kind should be tracked as a four-card move.");
+  assert.equal(isValidMove(fourCardBomb.cards), true, "Four of a kind should be a valid hand.");
+
   const flush = identifyMove([
     getCard("3", "Hearts"),
     getCard("5", "Hearts"),
@@ -123,6 +134,52 @@ function run(): void {
 
   assert.ok(fourOfAKind && straightFlush, "Expected four of a kind and straight flush samples to be valid.");
   assert.ok(compareMoves(straightFlush, fourOfAKind) > 0, "A straight flush should beat four of a kind.");
+
+  assert.equal(
+    canPlayMove(fourCardBomb.cards, identifyMove([getCard("9", "Diamonds")]), false, false).valid,
+    true,
+    "Four of a kind should beat a single.",
+  );
+  assert.equal(
+    canPlayMove(
+      fourCardBomb.cards,
+      identifyMove([getCard("10", "Diamonds"), getCard("10", "Clubs")]),
+      false,
+      false,
+    ).valid,
+    true,
+    "Four of a kind should beat a pair.",
+  );
+  assert.equal(
+    canPlayMove(
+      fourCardBomb.cards,
+      identifyMove([
+        getCard("J", "Diamonds"),
+        getCard("J", "Clubs"),
+        getCard("J", "Hearts"),
+      ]),
+      false,
+      false,
+    ).valid,
+    true,
+    "Four of a kind should beat a triple.",
+  );
+  assert.equal(
+    canPlayMove(
+      fourCardBomb.cards,
+      identifyMove([
+        getCard("8", "Spades"),
+        getCard("9", "Spades"),
+        getCard("10", "Spades"),
+        getCard("J", "Spades"),
+        getCard("Q", "Spades"),
+      ]),
+      false,
+      false,
+    ).valid,
+    false,
+    "Four of a kind should not replace a five-card hand.",
+  );
 
   const firstTurnInvalid = canPlayMove([getCard("4", "Diamonds")], null, true, true);
   const firstTurnValid = canPlayMove([threeOfDiamonds], null, true, true);

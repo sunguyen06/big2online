@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Hand } from "@/components/big2/Hand";
 import { PlayerSeat } from "@/components/big2/PlayerSeat";
@@ -9,7 +9,7 @@ import { PlayedCards } from "@/components/big2/PlayedCards";
 import { RulesModal } from "@/components/big2/RulesModal";
 import { WinnerModal } from "@/components/big2/WinnerModal";
 import { canPlayMove } from "@/lib/big2/engine";
-import { Seat } from "@/lib/big2/types";
+import { Card as GameCard, Seat } from "@/lib/big2/types";
 import { useMultiplayerGame } from "@/lib/multiplayer/useMultiplayerGame";
 import { MIN_ROOM_PLAYERS } from "@/lib/multiplayer/utils";
 import { useUiSoundEffects } from "@/lib/ui/useUiSoundEffects";
@@ -204,21 +204,27 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                   : "Your turn. Select cards to build a move."
                 : validation.message;
 
-  const handleToggleCard = (cardId: string) => {
-    if (!isMyTurn || pendingAction) {
-      return;
-    }
+  const handleToggleCard = useCallback(
+    (card: GameCard) => {
+      if (!isMyTurn || pendingAction) {
+        return;
+      }
 
-    const isSelecting = !selectedIds.includes(cardId);
+      let isSelecting = false;
 
-    setSelectedIds((current) =>
-      current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId],
-    );
+      setSelectedIds((current) => {
+        const currentHasCard = current.includes(card.id);
+        isSelecting = !currentHasCard;
 
-    if (isSelecting) {
-      playCardSelectSound();
-    }
-  };
+        return currentHasCard ? current.filter((id) => id !== card.id) : [...current, card.id];
+      });
+
+      if (isSelecting) {
+        playCardSelectSound();
+      }
+    },
+    [isMyTurn, pendingAction, playCardSelectSound, setSelectedIds],
+  );
 
   const handlePlay = async () => {
     if (!canPlay) {
@@ -450,7 +456,7 @@ export function MultiplayerGamePage({ roomCode }: { roomCode: string }) {
                     cards={privateHand}
                     dealt
                     interactive
-                    onCardClick={(card) => handleToggleCard(card.id)}
+                    onCardClick={handleToggleCard}
                     selectedIds={selectedIds}
                   />
                 </motion.div>

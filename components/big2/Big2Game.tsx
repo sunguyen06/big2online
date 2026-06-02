@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { GameControls } from "@/components/big2/GameControls";
 import { Hand } from "@/components/big2/Hand";
@@ -16,7 +16,7 @@ import {
   getSelectionValidation,
   setPhase,
 } from "@/lib/big2/engine";
-import { GameState } from "@/lib/big2/types";
+import { Card as GameCard, GameState } from "@/lib/big2/types";
 import { useUiSoundEffects } from "@/lib/ui/useUiSoundEffects";
 
 const DEALING_DELAY_MS = 1500;
@@ -145,21 +145,27 @@ export function Big2Game() {
       : [];
   const playedBy = game.currentTrickPlayer !== null ? game.players[game.currentTrickPlayer] : null;
 
-  const toggleCard = (cardId: string) => {
-    if (game.currentPlayer !== 0 || game.winner !== null || game.phase !== "playing") {
-      return;
-    }
+  const toggleCard = useCallback(
+    (card: GameCard) => {
+      if (game.currentPlayer !== 0 || game.winner !== null || game.phase !== "playing") {
+        return;
+      }
 
-    const isSelecting = !selectedIds.includes(cardId);
+      let isSelecting = false;
 
-    setSelectedIds((current) =>
-      current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId],
-    );
+      setSelectedIds((current) => {
+        const currentHasCard = current.includes(card.id);
+        isSelecting = !currentHasCard;
 
-    if (isSelecting) {
-      playCardSelectSound();
-    }
-  };
+        return currentHasCard ? current.filter((id) => id !== card.id) : [...current, card.id];
+      });
+
+      if (isSelecting) {
+        playCardSelectSound();
+      }
+    },
+    [game.currentPlayer, game.phase, game.winner, playCardSelectSound],
+  );
 
   const handlePlay = () => {
     if (!validation.valid || !validation.move) {
@@ -277,7 +283,7 @@ export function Big2Game() {
                     cards={humanPlayer.hand}
                     selectedIds={selectedIds}
                     playableIds={playableCardIds}
-                    onCardClick={(card) => toggleCard(card.id)}
+                    onCardClick={toggleCard}
                     interactive
                     dealt={game.phase !== "dealing"}
                   />

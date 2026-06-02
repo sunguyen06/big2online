@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { Card as PlayingCard } from "@/components/big2/Card";
 import { EvaluatedMove, Seat } from "@/lib/big2/types";
 
@@ -18,8 +17,6 @@ const originBySeat: Record<Seat, { x: number; y: number }> = {
 };
 
 export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsProps) {
-  const origin = originBySeat[seat];
-
   return (
     <div className="glass-panel min-h-[200px] rounded-[2rem] border-white/10 p-4 sm:p-5 lg:min-h-[220px]">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -33,38 +30,17 @@ export function PlayedCards({ move, seat = "north", playerName }: PlayedCardsPro
       </div>
 
       <div className="grid min-h-[110px] place-items-center rounded-[1.6rem] border border-white/6 bg-black/10 px-3 py-3">
-        <AnimatePresence mode="wait">
-          {move ? (
-            <motion.div
-              key={move.cards.map((card) => card.id).join("-")}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="flex flex-wrap items-center justify-center gap-2 sm:gap-3"
-            >
-              {move.cards.map((card, index) => (
-                <motion.div
-                  key={card.id}
-                  initial={{ opacity: 0, x: origin.x, y: origin.y, rotate: origin.x / 24 }}
-                  animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
-                  transition={{ duration: 0.42, delay: index * 0.04, type: "spring", stiffness: 280, damping: 28 }}
-                >
-                  <PlayingCard animationKey={`${move.summary}-${card.id}`} card={card} size="sm" />
-                </motion.div>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="empty-trick"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="rounded-[1.6rem] border border-dashed border-emerald-100/18 bg-black/12 px-6 py-8 text-center text-sm text-slate-200/60"
-            >
-              The center is clear. Lead any valid move.
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {move ? (
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            {move.cards.map((card) => (
+              <PlayingCard key={card.id} animationKey={`${move.summary}-${card.id}`} card={card} size="sm" />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[1.6rem] border border-dashed border-emerald-100/18 bg-black/12 px-6 py-8 text-center text-sm text-slate-200/60">
+            The center is clear. Lead any valid move.
+          </div>
+        )}
       </div>
     </div>
   );

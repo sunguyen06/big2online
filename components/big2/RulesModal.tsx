@@ -76,6 +76,14 @@ export function RulesModal({ open, onClose }: RulesModalProps) {
               </p>
             </section>
 
+            <section className="mt-4 rounded-[1.5rem] border border-white/8 bg-black/16 p-4">
+              <p className="panel-label">Four of a Kind Rule</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-100/78">
+                Four of a kind can be played as a four-card power move against singles, pairs, and triples. It still
+                follows the normal five-card ladder when you play the five-card version with a kicker.
+              </p>
+            </section>
+
             <section className="mt-4 rounded-[1.5rem] border border-amber-200/16 bg-amber-300/8 p-4">
               <p className="panel-label text-amber-100/72">Opening Rule</p>
               <p className="mt-3 text-sm leading-relaxed text-slate-100/82">

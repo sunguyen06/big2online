@@ -25,10 +25,19 @@ export function Hand({
 }: HandProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const cardSignature = cards.map((card) => card.id).join("|");
   const compactMode = cards.length >= 16;
-  const cardWidth = compactMode ? 96 : 112;
-  const baseSpacing = compactMode ? 50 : cards.length > 12 ? 62 : 76;
-  const playableSet = new Set(playableIds);
+  const cardWidth = compactMode ? 96 : cards.length >= 10 ? 108 : 112;
+  const baseSpacing = compactMode ? 52 : cards.length >= 13 ? 82 : cards.length >= 10 ? 86 : 76;
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds.join("|")]);
+  const playableSet = useMemo(() => new Set(playableIds), [playableIds.join("|")]);
+  const cardClickHandlers = useMemo(() => {
+    if (!onCardClick) {
+      return null;
+    }
+
+    return new Map(cards.map((card) => [card.id, () => onCardClick(card)] as const));
+  }, [cardSignature, onCardClick]);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -54,12 +63,12 @@ export function Hand({
     const availableWidth = Math.max(cardWidth, containerWidth - 12);
     const fittedSpacing = Math.floor((availableWidth - cardWidth) / (cards.length - 1));
 
-    return Math.max(28, Math.min(baseSpacing, fittedSpacing));
+    return Math.max(compactMode ? 30 : 44, Math.min(baseSpacing, fittedSpacing));
   }, [baseSpacing, cardWidth, cards.length, containerWidth]);
 
   const positions = useMemo(
     () => cards.map((_, index) => index * spacing),
-    [cards, spacing],
+    [cards.length, spacing],
   );
   const width = Math.max(cardWidth, (positions.at(-1) ?? 0) + cardWidth);
   const shouldScroll = containerWidth > 0 && width > containerWidth;
@@ -75,7 +84,7 @@ export function Hand({
     >
       <div className={`relative mx-auto min-w-max ${handHeightClass}`} style={{ width }}>
         {cards.map((card, index) => {
-          const selected = selectedIds.includes(card.id);
+          const selected = selectedSet.has(card.id);
           const offset = positions[index] ?? 0;
 
           return (
@@ -93,10 +102,10 @@ export function Hand({
                 selected={selected}
                 playable={interactive && playableSet.has(card.id)}
                 interactive={interactive}
-                onClick={onCardClick ? () => onCardClick(card) : undefined}
+                onClick={cardClickHandlers?.get(card.id)}
                 size={compactMode ? "compact" : "md"}
                 delay={dealt ? index * 0.045 : 0}
-                initialOffset={{ x: 0, y: 140, rotate: 0 }}
+                initialOffset={HAND_INITIAL_OFFSET}
               />
             </div>
           );
@@ -105,3 +114,5 @@ export function Hand({
     </div>
   );
 }
+
+const HAND_INITIAL_OFFSET = { x: 0, y: 140, rotate: 0 } as const;

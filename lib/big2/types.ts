@@ -36,7 +36,7 @@ export interface Move {
   cards: Card[];
   type: MoveType;
   handType: MoveType;
-  cardCount: 1 | 2 | 3 | 5;
+  cardCount: 1 | 2 | 3 | 4 | 5;
   isBomb?: boolean;
   categoryRank: number;
   primaryRank: CardRank;
